@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Mac's pointer, drawn large on the phone in trackpad mode: a classic arrow, white with a
+     2 dp black outline over a soft shadow. 1 viewport unit = 1 dp; the hotspot (arrow tip) is at
+     (3, 3), see POINTER_HOTSPOT_DP in DisplayActivity. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="33dp"
+    android:viewportWidth="24"
+    android:viewportHeight="33">
+    <!-- Soft shadow: the arrow offset down-right, translucent with a wide translucent edge. -->
+    <group
+        android:translateX="1"
+        android:translateY="1.6">
+        <path
+            android:fillColor="#40000000"
+            android:pathData="M3,3 L3,24.6 L7.86,20 L11.4,28.1 L14.6,26.8 L11.1,18.7 L17.85,18.7 Z"
+            android:strokeWidth="5"
+            android:strokeColor="#26000000"
+            android:strokeLineJoin="round" />
+    </group>
+    <!-- Outline: 2 dp outside the white arrow (a 4 dp stroke, half covered by the fill). -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3,3 L3,24.6 L7.86,20 L11.4,28.1 L14.6,26.8 L11.1,18.7 L17.85,18.7 Z"
+        android:strokeWidth="4"
+        android:strokeColor="#FF000000"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,3 L3,24.6 L7.86,20 L11.4,28.1 L14.6,26.8 L11.1,18.7 L17.85,18.7 Z" />
+</vector>

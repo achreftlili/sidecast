@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microphone glyph: capsule, U-shaped holder and stem. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3 A3,3 0 0 0 9,6 V11 A3,3 0 0 0 15,11 V6 A3,3 0 0 0 12,3 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,11 H7.5 A4.5,4.5 0 0 0 16.5,11 H18 A6,6 0 0 1 12.75,16.95 V20 H11.25 V16.95 A6,6 0 0 1 6,11 Z" />
+</vector>
