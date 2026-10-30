@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Builds, tests and packages the Android app:
 #   <repo>/dist/Sidecast-<VERSION>.apk
-# Signed with android/keystore.properties when present, otherwise with the local debug key
-# (fine for personal sideloading).
+# Signed with android/keystore.properties when present, otherwise with this
+# computer's debug key (fine for installing on your own phone). With a keystore
+# it also builds the Play bundle <repo>/dist/Sidecast-<VERSION>.aab.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ANDROID_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/env.sh"
+sidecast_android_env
+ANDROID_DIR="$SIDECAST_ANDROID_DIR"
 REPO_DIR="$(cd "$ANDROID_DIR/.." && pwd)"
-
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21}"
-export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 
 VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 if [[ -z "$VERSION" ]]; then
@@ -18,12 +18,11 @@ if [[ -z "$VERSION" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$ANDROID_DIR/local.properties" ]]; then
-  echo "sdk.dir=$ANDROID_HOME" > "$ANDROID_DIR/local.properties"
-fi
+TASKS=(clean testDebugUnitTest assembleRelease)
+[[ -f "$ANDROID_DIR/keystore.properties" ]] && TASKS+=(bundleRelease)
 
 cd "$ANDROID_DIR"
-./gradlew --no-daemon clean testDebugUnitTest assembleRelease bundleRelease
+./gradlew --no-daemon "${TASKS[@]}"
 
 APK="$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk"
 if [[ ! -f "$APK" ]]; then
@@ -36,7 +35,6 @@ OUT="$REPO_DIR/dist/Sidecast-$VERSION.apk"
 cp "$APK" "$OUT"
 echo "Built $OUT"
 
-# Play Store bundle (signed with the upload key from android/keystore.properties when present).
 AAB="$ANDROID_DIR/app/build/outputs/bundle/release/app-release.aab"
 if [[ -f "$AAB" ]]; then
   cp "$AAB" "$REPO_DIR/dist/Sidecast-$VERSION.aab"

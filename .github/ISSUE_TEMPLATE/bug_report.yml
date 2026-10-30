@@ -1,0 +1,62 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect the phone over Wi-Fi
+        2. Switch to trackpad mode
+        3. Tap in VS Code
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Sidecast version or commit
+      description: Output of `git rev-parse --short HEAD`, or the version in the Mac's Settings window.
+    validations:
+      required: true
+  - type: input
+    id: computer
+    attributes:
+      label: Computer
+      placeholder: MacBook Air M2, macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone
+      placeholder: Pixel 8, Android 16
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - Same Wi-Fi
+        - Phone hotspot
+        - Tailscale (remote)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Mac: `log show --last 10m --info --predicate 'subsystem == "com.achreftlili.sidecast"'`
+        Phone: `adb logcat -d -s Sidecast/Net Sidecast/Session Sidecast/Video Sidecast/Touch Sidecast/Mic`
+        Remove anything private (names, addresses) before posting.
+      render: text

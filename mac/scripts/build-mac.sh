@@ -5,8 +5,10 @@
 #
 # Signed with the "Sidecast Local Signing" certificate when it is in the login
 # keychain (a stable identity, so macOS keeps Screen Recording / Accessibility
-# grants across rebuilds), otherwise ad-hoc. Optional Developer ID signing +
-# notarization (off unless these are set):
+# grants across rebuilds; create it once with `make mac-signing`), otherwise
+# ad-hoc. Builds for this Mac's architecture (arm64 or x86_64).
+#   SIDECAST_ARCH            build for another architecture (arm64 | x86_64)
+# Optional Developer ID signing + notarization (off unless these are set):
 #   SIDECAST_SIGN_IDENTITY   e.g. "Developer ID Application: Jane Doe (TEAMID)"
 #   SIDECAST_NOTARY_PROFILE  keychain profile created with `xcrun notarytool store-credentials`
 set -euo pipefail
@@ -24,10 +26,16 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "error: VERSION must look like 1.2.3 (got '$VERSION')" >&2
     exit 1
 fi
+ARCH="${SIDECAST_ARCH:-$(uname -m)}"
+if [[ "$ARCH" != arm64 && "$ARCH" != x86_64 ]]; then
+    echo "error: unsupported architecture '$ARCH' (arm64 or x86_64)" >&2
+    exit 1
+fi
+export SIDECAST_ARCH="$ARCH"   # for build-mic-driver.sh
 LOCAL_IDENTITY="Sidecast Local Signing"
 SIGN_IDENTITY="${SIDECAST_SIGN_IDENTITY:-}"
 if [[ -z "$SIGN_IDENTITY" ]]; then
-    if security find-identity -p codesigning 2>/dev/null | grep -q "\"$LOCAL_IDENTITY\""; then
+    if [[ "$(security find-identity -p codesigning 2>/dev/null)" == *"\"$LOCAL_IDENTITY\""* ]]; then
         SIGN_IDENTITY="$LOCAL_IDENTITY"
     else
         SIGN_IDENTITY="-"
@@ -39,10 +47,10 @@ ENTITLEMENTS="$SCRIPT_DIR/Sidecast.entitlements"
 
 step() { printf '\n==> %s\n' "$*"; }
 
-step "Building $APP_NAME $VERSION (release, arm64)"
+step "Building $APP_NAME $VERSION (release, $ARCH)"
 cd "$MAC_DIR"
-swift build -c release --arch arm64
-BIN_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
+swift build -c release --arch "$ARCH"
+BIN_DIR="$(swift build -c release --arch "$ARCH" --show-bin-path)"
 
 step "Rendering the app icon"
 mkdir -p "$WORK"
