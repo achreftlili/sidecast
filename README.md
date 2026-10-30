@@ -15,6 +15,18 @@ The Mac creates a virtual monitor, captures it with ScreenCaptureKit, encodes it
 
 **Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone.
 
+## How Sidecast compares
+
+Using an Android device as a Mac display isn't new: Duet Display, Wing Display and Splashtop are commercial options, and [SideScreen](https://github.com/tranvuongquocdat/SideScreen), which Sidecast builds on, is open source. What Sidecast adds:
+
+- **Everything is free**: commercial apps charge for features such as touch control or wireless use. Here everything is Apache 2.0, with no account and no subscription.
+- **More than a screen**: touch, a trackpad mode with a visible pointer, Mac trackpad gestures, typing and the phone's microphone, in one app.
+- **Works away from home**: LAN first, then Tailscale automatically, with nothing opened on your router and a data saver on mobile data.
+- **Secure by default**: TLS on every connection, the Mac's certificate pinned at pairing, and a token per device.
+- **Built for phones**: most alternatives target tablets; Sidecast is designed around the phone you already carry.
+
+Where the alternatives are ahead today: they install from an app store instead of from source, many offer a USB connection for lower latency, and some also run on iPad or Windows. [docs/ROADMAP.md](docs/ROADMAP.md) lists what's planned.
+
 ## Install from source
 
 You need **Xcode** (free, App Store; the Command Line Tools alone are enough to install, Xcode is needed to run the tests), **JDK 21** and the **Android SDK**. On a Mac with [Homebrew](https://brew.sh):
