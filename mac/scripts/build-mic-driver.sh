@@ -5,6 +5,8 @@
 # property/loopback check in a throwaway process (never touches coreaudiod).
 #
 #   mac/scripts/build-mic-driver.sh <output.driver> [sign identity, default "-"]
+#
+# Architecture: $SIDECAST_ARCH (arm64 | x86_64), default this Mac's.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +16,7 @@ WORK="$MAC_DIR/.build/mic-driver"
 OUT="${1:?usage: build-mic-driver.sh <output.driver> [sign identity]}"
 SIGN_IDENTITY="${2:--}"
 LOCAL_IDENTITY="Sidecast Local Signing"
+ARCH="${SIDECAST_ARCH:-$(uname -m)}"
 
 header_value() { sed -n "s/^#define $1 \"\(.*\)\"$/\1/p" "$SRC/include/SidecastMicDriver.h"; }
 DRIVER_VERSION="$(header_value SCM_DRIVER_VERSION)"
@@ -22,7 +25,7 @@ FACTORY_UUID="$(header_value SCM_FACTORY_UUID)"
 # kAudioServerPlugInTypeUUID
 PLUGIN_TYPE_UUID="443ABAB8-E7B3-491A-B985-BEB9187030DB"
 
-CFLAGS=(-arch arm64 -mmacosx-version-min=15.0 -std=c11 -O2 -g0
+CFLAGS=(-arch "$ARCH" -mmacosx-version-min=15.0 -std=c11 -O2 -g0
         -Wall -Wextra -Wpedantic -Wno-unused-parameter -Werror
         -fvisibility=hidden -I "$SRC/include")
 
@@ -105,7 +108,7 @@ fi
 codesign --verify --strict "$OUT"
 
 # Load it in a throwaway process and check devices, formats and the loopback.
-xcrun clang -arch arm64 -mmacosx-version-min=15.0 -std=c11 -O1 -Wall -Wno-unused-parameter \
+xcrun clang -arch "$ARCH" -mmacosx-version-min=15.0 -std=c11 -O1 -Wall -Wno-unused-parameter \
     "$SCRIPT_DIR/check-mic-driver.c" -framework CoreAudio -framework CoreFoundation \
     -o "$WORK/check-mic-driver"
 "$WORK/check-mic-driver" "$OUT"

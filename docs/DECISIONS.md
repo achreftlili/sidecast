@@ -37,11 +37,12 @@ It is a new, smaller codebase that ports the proven core of
 | Q31 | **Trackpad mode** (v0.5): a toggle on the phone switches between touchscreen (absolute) and trackpad (relative cursor, tap = click at cursor) for precise apps like VS Code. |
 | Q32 | **Human-like clicks + visible trackpad pointer** (v0.6): clicks are injected as move → down → ~40 ms → up (Electron apps like VS Code drop instant clicks); in trackpad mode the Mac streams its pointer position (CURSOR) and the phone draws a large pointer overlay. |
 | Q26 | Mac builds are signed with a local self-signed **"Sidecast Local Signing"** certificate so macOS keeps permissions across updates. |
+| Q33 | **Open source, built from source** (0.6, 2026-10-30): Apache 2.0. Users clone the repository and install with `make install-mac` / `make install-android`; no app stores, notarization or paid certificates. Each Mac creates its own "Sidecast Local Signing" certificate with `make mac-signing`; the phone app is installed over adb (exempt from Android developer verification). Mac builds target the host architecture (Intel compiles, untested). |
 
 ## Known limitations (accepted for v1)
 
 - `CGVirtualDisplay` is private API; a macOS update can break it.
-- Builds are signed with a local self-signed certificate (Q26), not a Developer ID: fine on this Mac, but other Macs would need right-click → Open and their own permission grants.
+- Builds are signed with a per-Mac self-signed certificate (Q26, Q33), not a Developer ID: fine for apps built on the same Mac, but a build copied to another Mac would be blocked by Gatekeeper.
 - Pairing: an *active* man-in-the-middle present during the 2-minute pairing window could brute-force the 6-digit code. Acceptable on a home network; a PAKE (e.g. SPAKE2) is the upgrade path.
 - Dragging the app to the Trash does not remove the sudoers rule — use the menu item "Remove sleep permission…" first.
 - One phone at a time (an *authenticated* new phone takes over; unauthenticated connections never disturb the stream).
