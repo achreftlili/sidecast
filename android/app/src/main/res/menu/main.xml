@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_mic_enabled"
+        android:checkable="true"
+        android:title="@string/settings_mic_enabled"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_data_saver"
+        android:checkable="true"
+        android:title="@string/settings_data_saver"
+        app:showAsAction="never" />
+</menu>

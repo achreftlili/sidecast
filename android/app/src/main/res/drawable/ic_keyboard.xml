@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keyboard glyph: outlined body, two rows of keys and a space bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M4,5 H20 A2,2 0 0 1 22,7 V17 A2,2 0 0 1 20,19 H4 A2,2 0 0 1 2,17 V7 A2,2 0 0 1 4,5 Z M4,7 V17 H20 V7 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,8 h2 v2 h-2 Z M8,8 h2 v2 h-2 Z M11,8 h2 v2 h-2 Z M14,8 h2 v2 h-2 Z M17,8 h2 v2 h-2 Z M5,11 h2 v2 h-2 Z M8,11 h2 v2 h-2 Z M11,11 h2 v2 h-2 Z M14,11 h2 v2 h-2 Z M17,11 h2 v2 h-2 Z M8,14.25 h8 v1.75 h-8 Z" />
+</vector>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#2A5BD7</color>
+    <color name="status_online">#2E9E5B</color>
+
+    <!-- Light scheme (values-night overrides) -->
+    <color name="md_primary">#2A5BD7</color>
+    <color name="md_on_primary">#FFFFFF</color>
+    <color name="md_primary_container">#DAE2FF</color>
+    <color name="md_on_primary_container">#001848</color>
+    <color name="md_secondary_container">#DBE2F9</color>
+    <color name="md_on_secondary_container">#141B2C</color>
+    <color name="md_background">#F9F9FF</color>
+    <color name="md_surface">#F9F9FF</color>
+    <color name="md_on_surface">#191C20</color>
+    <color name="md_surface_variant">#E0E2EC</color>
+    <color name="md_on_surface_variant">#43474E</color>
+    <color name="md_surface_container_lowest">#FFFFFF</color>
+    <color name="md_surface_container_low">#F3F3FA</color>
+    <color name="md_surface_container">#EDEDF4</color>
+    <color name="md_surface_container_high">#E7E8EE</color>
+    <color name="md_surface_container_highest">#E2E2E9</color>
+    <color name="md_outline">#74777F</color>
+    <color name="md_outline_variant">#C4C6CF</color>
+
+    <!-- Always-dark display screen -->
+    <color name="display_primary">#B2C5FF</color>
+    <color name="display_on_primary">#002B74</color>
+    <color name="display_scrim">#B3000000</color>
+    <color name="display_stats_background">#99000000</color>
+    <color name="display_detail_text">#D9FFFFFF</color>
+    <color name="display_keyboard_button_background">#B3000000</color>
+    <color name="display_keyboard_button_stroke">#80FFFFFF</color>
+    <color name="display_keyboard_button_ripple">#40FFFFFF</color>
+    <color name="display_mic_indicator_background">#CCB3261E</color>
+</resources>

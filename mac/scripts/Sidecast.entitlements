@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Not sandboxed: Sidecast uses the private CGVirtualDisplay API, posts
+	     HID events, and runs /usr/bin/openssl, /usr/bin/sudo -n pmset. -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<!-- Needed only once signed with the hardened runtime (Developer ID):
+	     the in-process AppleScript admin prompt for the sudoers rule. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

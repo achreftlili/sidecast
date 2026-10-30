@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/pair_message"
+        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/codeLayout"
+        style="?attr/textInputOutlinedStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/pair_hint">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/code"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:imeOptions="actionDone|flagNoExtractUi"
+            android:importantForAutofill="no"
+            android:inputType="number"
+            android:letterSpacing="0.3"
+            android:maxLength="6"
+            android:maxLines="1"
+            android:textSize="28sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/expiry"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

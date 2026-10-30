@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- TLS socket to the Mac. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Find the network whose subnet contains the Mac (LanSocketBinder). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Multicast lock while browsing for Bonjour services (some Wi-Fi drivers filter mDNS otherwise). -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Required by WifiManager.WifiLock (low-latency Wi-Fi mode while streaming). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Phone microphone as "Sidecast Microphone" on the Mac (PROTOCOL.md §7.2). Asked at runtime
+         the first time a Mac app records from it; captured only while the display screen is in
+         the foreground, so no foreground service is needed. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- The microphone is optional: without one the Mac is told "unavailable". -->
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+
+    <application
+        android:name=".SidecastApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Sidecast"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Landscape only (docs/DECISIONS.md); the stream is letterboxed if the OS ignores this
+             on large screens. adjustNothing: the soft keyboard covers the bottom of the stream
+             instead of resizing or panning it, so touch mapping is unchanged. -->
+        <activity
+            android:name=".ui.DisplayActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.Sidecast.Display"
+            android:windowSoftInputMode="adjustNothing|stateHidden"
+            tools:ignore="DiscouragedApi" />
+    </application>
+
+</manifest>
