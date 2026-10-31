@@ -70,7 +70,8 @@ fn device_info(parent: PCWSTR, index: u32) -> Option<DISPLAY_DEVICEW> {
     unsafe { EnumDisplayDevicesW(parent, index, &mut device, 0) }.as_bool().then_some(device)
 }
 
-/// Every display source with a monitor, attached or not (mirroring drivers left out).
+/// Every display source, attached or not (mirroring drivers left out). A
+/// detached source may report no monitor; its adapter still tells whose it is.
 pub fn monitors() -> Vec<Monitor> {
     let mut found = Vec::new();
     for index in 0.. {
@@ -80,14 +81,14 @@ pub fn monitors() -> Vec<Monitor> {
         }
         let device = from_wide(&adapter.DeviceName);
         let name = wide(&device);
-        let Some(monitor) = device_info(pcwstr(&name), 0) else { continue };
+        let monitor = device_info(pcwstr(&name), 0);
         let attached = adapter.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP == DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
         let (rect, refresh) = if attached { current_mode(&device).unwrap_or_default() } else { Default::default() };
         found.push(Monitor {
             adapter: from_wide(&adapter.DeviceString),
             adapter_id: from_wide(&adapter.DeviceID),
-            monitor_name: from_wide(&monitor.DeviceString),
-            monitor_id: from_wide(&monitor.DeviceID),
+            monitor_name: monitor.as_ref().map(|m| from_wide(&m.DeviceString)).unwrap_or_default(),
+            monitor_id: monitor.as_ref().map(|m| from_wide(&m.DeviceID)).unwrap_or_default(),
             attached,
             primary: adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE == DISPLAY_DEVICE_PRIMARY_DEVICE,
             rect,

@@ -658,7 +658,8 @@ mod tests {
                 keyframe_interval: 2.0,
             };
             let mut encoder = factory.create(&config).expect("an available encoder opens and passes its self-test");
-            let (mut outputs, mut keyframes) = (0, 0);
+            let mut keyframes_at = Vec::new();
+            let mut outputs = 0;
             for i in 0..30u64 {
                 if i == 10 {
                     encoder.set_bitrate(1_000_000);
@@ -670,16 +671,19 @@ mod tests {
                     assert!(encoded.data.starts_with(&[0, 0, 0, 1]));
                     if encoded.is_keyframe {
                         assert!(info.has_parameter_sets && info.has_random_access_slice);
-                        keyframes += 1;
-                    }
-                    if i == 0 || i == 20 {
-                        assert!(encoded.is_keyframe, "{kind:?}: frame {i} was forced to be a keyframe");
+                        keyframes_at.push(i);
                     }
                     outputs += 1;
                 }
             }
             assert!(outputs >= 25, "{kind:?}: one access unit per frame (got {outputs} of 30)");
-            assert!(keyframes >= 2, "{kind:?}: forced keyframes ({keyframes})");
+            // A hardware encoder may return an output a call or two late.
+            for forced in [0, 20] {
+                assert!(
+                    keyframes_at.iter().any(|k| (forced..=forced + 2).contains(k)),
+                    "{kind:?}: frame {forced} was forced to be a keyframe (keyframes at {keyframes_at:?})"
+                );
+            }
             assert!(factory.create(&EncoderConfig { codec: VideoCodec::Hevc, ..config }).is_err());
         }
     }

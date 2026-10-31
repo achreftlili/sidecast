@@ -1,16 +1,19 @@
 //! The Windows `DisplayBackend`: which monitor a phone gets, and its capture.
 //!
 //! - With the Virtual Display Driver installed, one of its monitors is set
-//!   to the phone's resolution and attached to the desktop (extending it, to
-//!   the right of the other monitors) while the phone streams; afterwards it
-//!   goes back to how it was (detached again, or its previous mode). A
-//!   resolution the driver does not offer yet is added to its settings file
-//!   and the driver reloaded (DECISIONS Q37).
+//!   to the phone's resolution and attached to the desktop (extending it,
+//!   where the user last put it, else to the right of the other monitors)
+//!   while the phone streams, and detached again afterwards, so no empty
+//!   screen stays where windows and the pointer get lost. (When it is the
+//!   only display, as on a headless PC, its previous mode comes back
+//!   instead.) A resolution the driver does not offer yet is added to its
+//!   settings file and the driver reloaded (DECISIONS Q37).
 //! - Without it (or when that fails, or when the user picked a monitor), an
 //!   existing monitor is streamed: the chosen one, else a secondary one,
 //!   else the primary (mirroring). A monitor of another shape is letterboxed.
 
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use sidecast_core::streaming::StreamPlan;
@@ -24,15 +27,19 @@ use super::vdd;
 use super::vdd_config::{Mode, RELEASES_URL, RELOAD_DRIVER, add_mode, best_mode, set_display_count};
 use crate::platform::MonitorChoice;
 
+/// Where the user last had the virtual monitor (top-left, desktop pixels).
+type LastPosition = Arc<Mutex<Option<(i32, i32)>>>;
+
 /// Streams a virtual monitor of the Virtual Display Driver, or an existing monitor.
 #[derive(Debug)]
 pub struct WindowsDisplay {
     choice: MonitorChoice,
+    last_position: LastPosition,
 }
 
 impl WindowsDisplay {
     pub fn new(choice: MonitorChoice) -> Self {
-        WindowsDisplay { choice }
+        WindowsDisplay { choice, last_position: LastPosition::default() }
     }
 
     /// Picks (and for a virtual monitor, prepares) the monitor for `plan`.
@@ -54,7 +61,7 @@ impl WindowsDisplay {
                 plan.display.pixel_height() as u32,
                 plan.display.refresh_rate.max(1) as u32,
             );
-            match virtual_monitor(wanted) {
+            match virtual_monitor(wanted, &self.last_position) {
                 Ok(target) => return Ok(target),
                 Err(error) => log::warn!(
                     "display: the Virtual Display Driver could not provide a {wanted} monitor ({error}); streaming an existing monitor instead"
@@ -129,19 +136,26 @@ impl Target {
     }
 }
 
-/// How a virtual monitor was before the stream.
+/// What to do with a virtual monitor after its stream.
 #[derive(Debug)]
 struct Restore {
     device: String,
-    /// `None`: it was detached.
+    /// Its mode before the stream (`None`: it was detached).
     previous: Option<(Rect, u32)>,
+    last_position: LastPosition,
 }
 
 impl Restore {
     fn apply(self) {
-        let placement = match self.previous {
-            None => Placement::Detached,
-            Some((rect, refresh)) => Placement::Attached {
+        // The user may have moved it during the stream: start there next time.
+        if let Some((rect, _)) = display::current_mode(&self.device) {
+            *self.last_position.lock().unwrap_or_else(|p| p.into_inner()) = Some((rect.left, rect.top));
+        }
+        let others = display::monitors().into_iter().any(|m| m.attached && m.device != self.device);
+        let placement = match (others, self.previous) {
+            (true, _) | (false, None) => Placement::Detached,
+            // The only display (a headless PC): detaching it would leave no desktop.
+            (false, Some((rect, refresh))) => Placement::Attached {
                 mode: Mode::new(rect.width as u32, rect.height as u32, refresh),
                 position: (rect.left, rect.top),
             },
@@ -150,9 +164,9 @@ impl Restore {
             Ok(()) => log::info!(
                 "display: virtual monitor {} {}",
                 self.device,
-                if self.previous.is_some() { "back to its previous mode" } else { "detached" }
+                if placement == Placement::Detached { "detached" } else { "back to its previous mode" }
             ),
-            Err(error) => log::warn!("display: cannot restore the virtual monitor: {error}"),
+            Err(error) => log::warn!("display: cannot put the virtual monitor back: {error}"),
         }
     }
 }
@@ -212,8 +226,40 @@ fn wait_for<T>(timeout: Duration, mut check: impl FnMut() -> Option<T>) -> Optio
     }
 }
 
+/// Where to attach `monitor`: where it is now; else where the user last had
+/// it; else to the right of everything, top-aligned with the primary monitor.
+fn positions(monitor: &Monitor, last_position: &LastPosition) -> Vec<(i32, i32)> {
+    if monitor.attached {
+        return vec![(monitor.rect.left, monitor.rect.top)];
+    }
+    let mut positions: Vec<(i32, i32)> =
+        last_position.lock().unwrap_or_else(|p| p.into_inner()).iter().copied().collect();
+    let others: Vec<Monitor> =
+        display::monitors().into_iter().filter(|m| m.attached && m.device != monitor.device).collect();
+    let right = others.iter().map(|m| m.rect.right()).max().unwrap_or(0);
+    let top = others.iter().find(|m| m.primary).map_or(0, |m| m.rect.top);
+    positions.push((right, top));
+    positions
+}
+
+/// Attaches `device` at the first of `modes` Windows accepts, trying each
+/// position. Windows refuses modes the monitor does not offer, which also
+/// works for a detached monitor that lists no modes.
+fn attach(device: &str, modes: &[Mode], positions: &[(i32, i32)]) -> Result<Mode, String> {
+    let mut errors = Vec::new();
+    for mode in modes {
+        for position in positions {
+            match display::place(device, Placement::Attached { mode: *mode, position: *position }) {
+                Ok(()) => return Ok(*mode),
+                Err(error) => errors.push(error),
+            }
+        }
+    }
+    Err(if errors.is_empty() { "no mode to try".into() } else { errors.join("; ") })
+}
+
 /// One of the driver's monitors, attached at `wanted` (or the closest mode it offers).
-fn virtual_monitor(wanted: Mode) -> Result<Target, String> {
+fn virtual_monitor(wanted: Mode, last_position: &LastPosition) -> Result<Target, String> {
     let mut monitor = match vdd::monitors().into_iter().max_by_key(|m| m.attached) {
         Some(monitor) => monitor,
         None => {
@@ -223,60 +269,46 @@ fn virtual_monitor(wanted: Mode) -> Result<Target, String> {
                 .ok_or("the driver did not add a monitor")?
         }
     };
+    let previous = if monitor.attached { display::current_mode(&monitor.device) } else { None };
 
-    if !display::modes(&monitor.device).contains(&wanted) {
+    // 1. Straight at the phone's mode: works whenever the driver offers it.
+    let mut placed = attach(&monitor.device, &[wanted], &positions(&monitor, last_position));
+    // 2. Not offered: add it to the driver's settings, restart the driver
+    //    (its monitors leave and come back), and attach the one that returns.
+    if placed.is_err() {
         match offer_mode(wanted) {
-            Ok(reloaded) => {
-                if reloaded {
-                    // The driver restarts its adapter: monitors leave and come back.
-                    let found = wait_for(Duration::from_secs(15), || {
-                        vdd::monitors().into_iter().find(|m| display::modes(&m.device).contains(&wanted))
-                    });
-                    match found {
-                        Some(m) => monitor = m,
-                        None => {
-                            log::warn!("display: the driver reloaded but does not offer {wanted} yet");
-                            if let Some(m) = vdd::monitors().into_iter().max_by_key(|m| m.attached) {
-                                monitor = m;
-                            }
-                        }
+            Ok(()) => {
+                let found = wait_for(Duration::from_secs(15), || {
+                    vdd::monitors().into_iter().find_map(|m| {
+                        attach(&m.device, &[wanted], &positions(&m, last_position)).ok().map(|mode| (m, mode))
+                    })
+                });
+                match found {
+                    Some((m, mode)) => {
+                        monitor = m;
+                        placed = Ok(mode);
                     }
+                    None => log::warn!("display: the driver restarted but does not take {wanted} yet"),
                 }
             }
             Err(error) => log::warn!("display: {error}"),
         }
     }
-    let offered = display::modes(&monitor.device);
-    let mode = if offered.contains(&wanted) {
-        wanted
-    } else {
-        let mode = best_mode(&offered, wanted).ok_or("the virtual monitor offers no mode")?;
-        log::warn!("display: the virtual monitor does not offer {wanted}; using {mode} (the picture is scaled)");
-        mode
-    };
-
-    let previous = if monitor.attached { display::current_mode(&monitor.device) } else { None };
-    let position = match previous {
-        Some((rect, _)) => (rect.left, rect.top),
-        None => {
-            // To the right of everything else, top-aligned with the primary monitor.
-            let others = display::monitors();
-            let right = others.iter().filter(|m| m.attached).map(|m| m.rect.right()).max().unwrap_or(0);
-            let top = others.iter().find(|m| m.primary).map_or(0, |m| m.rect.top);
-            (right, top)
+    // 3. Still refused: the closest mode it offers (the picture is scaled).
+    if placed.is_err() {
+        if let Some(m) = vdd::monitors().into_iter().max_by_key(|m| m.attached) {
+            monitor = m;
         }
-    };
-    let placement = Placement::Attached { mode, position };
-    if let Err(error) = display::place(&monitor.device, placement) {
-        // Some setups refuse a refresh rate: try the same size at any offered rate.
-        let fallback = offered.iter().find(|m| (m.width, m.height) == (mode.width, mode.height) && **m != mode);
-        match fallback {
-            Some(other) => display::place(&monitor.device, Placement::Attached { mode: *other, position })
-                .map_err(|e| format!("{error}; {e}"))?,
-            None => return Err(error),
+        let offered = display::modes(&monitor.device);
+        if let Some(closest) = best_mode(&offered, wanted) {
+            log::warn!("display: the virtual monitor does not take {wanted}; using {closest} (the picture is scaled)");
+            let same_size = offered.iter().copied().filter(|m| (m.width, m.height) == (closest.width, closest.height));
+            let candidates: Vec<Mode> = std::iter::once(closest).chain(same_size.filter(|m| *m != closest)).collect();
+            placed = attach(&monitor.device, &candidates, &positions(&monitor, last_position));
         }
     }
-    let restore = Restore { device: monitor.device.clone(), previous };
+    let mode = placed.map_err(|e| format!("cannot attach the virtual monitor: {e}"))?;
+    let restore = Restore { device: monitor.device.clone(), previous, last_position: last_position.clone() };
     let applied = wait_for(Duration::from_secs(5), || {
         display::current_mode(&monitor.device)
             .filter(|(rect, _)| (rect.width as u32, rect.height as u32) == (mode.width, mode.height))
@@ -297,9 +329,10 @@ fn virtual_monitor(wanted: Mode) -> Result<Target, String> {
     Ok(Target { device: monitor.device.clone(), rect, restore: Some(restore) })
 }
 
-/// Makes the driver offer `mode`: adds it to its settings file if missing
-/// and reloads the driver. `Ok(true)` when the driver was reloaded.
-fn offer_mode(mode: Mode) -> Result<bool, String> {
+/// Makes the driver offer `mode`: adds it to its settings file if missing,
+/// then restarts the driver so it reads them (also when the file already
+/// had it, in case it was edited since the driver started).
+fn offer_mode(mode: Mode) -> Result<(), String> {
     let (path, text, settings) = vdd::read_settings().ok_or_else(|| {
         format!(
             "cannot read the Virtual Display Driver's settings ({}); add {mode} to its resolutions to stream at the phone's resolution",
@@ -316,8 +349,7 @@ fn offer_mode(mode: Mode) -> Result<bool, String> {
         })?;
         log::info!("display: added {mode} to {}", path.display());
     }
-    vdd::send(RELOAD_DRIVER)?;
-    Ok(true)
+    vdd::send(RELOAD_DRIVER)
 }
 
 /// Writes `text` to `path` through a temporary file in the same folder.
