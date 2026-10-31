@@ -8,7 +8,7 @@ exactly like the Mac app, so the Android app works with it unchanged.
 |---|---|
 | `sidecast-core` | Pure logic, no I/O: framing and every message, pairing (HMAC proof, codes, tokens), the paired-device model, flow control and adaptive bitrate, stream planning, the gesture engine, keyboard mapping, the microphone jitter buffer, address classification. A port of the Mac's `SidecastKit` with its tests. |
 | `sidecast-server` | The host: TLS (rustls, ring), DNS-SD, the session state machine, streaming with flow control, input timing, microphone routing, persistence. Platform code plugs in through the traits in [`backend.rs`](sidecast-server/src/backend.rs). Optional software H.264 encoder (`openh264` feature). |
-| `sidecast-host` | The host program: `sidecast-host` on the command line (`--test-pattern` on any OS) and, on Windows, the `sidecast-tray` notification-area app. The Windows backends are in `src/platform/windows/` (experimental, DECISIONS Q37); Linux is a stub (`src/platform/linux.rs`) for the next pull request. |
+| `sidecast-host` | The host program: `sidecast-host` on the command line (`--test-pattern` on any OS) and, on Windows, the `sidecast-tray` notification-area app. The Windows backends are in `src/platform/windows/` (experimental, DECISIONS Q37), the Linux backends and the Linux tray icon in `src/platform/linux/` (experimental, GNOME on Wayland, DECISIONS Q38). |
 | `sidecast-probe` | A scripted fake phone that checks a host against the protocol and exits non-zero on any violation. |
 
 ## Build and test
@@ -21,6 +21,7 @@ Build Tools). `make doctor` checks it.
 make rust          # release build: rust/target/release/{sidecast-host,sidecast-probe}
 make test-rust     # rustfmt, clippy, unit and integration tests
 make conformance   # every probe against every host (see below)
+make e2e-linux     # Linux: the real GNOME backend on a headless GNOME (see "The Linux host")
 ```
 
 Run a host and a probe without a phone:
@@ -78,8 +79,8 @@ A host is a [`Backends`](sidecast-server/src/backend.rs) value passed to
 `sidecast_server::start`. The server owns the protocol, pairing, flow control,
 bitrate, keyframe cadence, gesture recognition and click timing; a backend only
 produces frames and injects input. `sidecast-host/src/platform/windows/mod.rs`
-and `linux.rs` return the platform's `Backends` (Linux: "not supported yet"),
-given the host's `PlatformOptions` (today: which existing monitor to stream).
+and `linux/mod.rs` return the platform's `Backends`, given the host's
+`PlatformOptions` (today: which existing monitor to stream).
 
 ```rust
 let mut backends = Backends::new(Arc::new(MyDisplay::new()), vec![Arc::new(MyHardwareEncoder), Arc::new(OpenH264Factory)]);
@@ -186,6 +187,38 @@ and `settings.json`. Files are written atomically, owner-only on Unix.
 
 SERVER_HELLO `platform` and the DNS-SD TXT `os` are the OS the host runs on
 (`ServerConfig::platform`, defaulting to the current OS; DECISIONS Q34).
+
+## The Linux host
+
+`src/platform/linux/` (DECISIONS Q38). On GNOME the backend talks to Mutter
+directly; elsewhere on Wayland to the xdg-desktop-portal; X11 is refused.
+
+| Module | Does |
+|---|---|
+| `mutter.rs` | `org.gnome.Mutter.RemoteDesktop` session + linked `ScreenCast` `RecordVirtual` (cursor as metadata): the virtual monitor, sized by the PipeWire format we ask for; input calls on that session |
+| `display_config.rs`, `monitors.rs` | 200 % scale for a HiDPI plan through `DisplayConfig.ApplyMonitorsConfig` (temporary, other monitors unchanged) |
+| `portal.rs` | the same through `ashpd`: RemoteDesktop + ScreenCast portal, virtual source where offered, else a monitor |
+| `capture.rs`, `pixels.rs` | the PipeWire stream (SHM/MemFd BGRx…), I420 conversion with the composited pointer, flow control, static-screen repeats |
+| `remote_input.rs`, `translate.rs`, `keymap.rs` | `InputEvent` → RemoteDesktop calls on a worker thread: evdev keys/buttons, keysyms, finger scroll, GNOME shortcuts |
+| `gst_encoder.rs` | `gstreamer` feature: `nvh264enc` / `vah264enc` / `vah264lpenc` / `vaapih264enc` → Annex-B |
+| `mic.rs` | "Sidecast Microphone", a PipeWire `Audio/Source` fed from the jitter buffer; Streaming ⇔ MIC_CONTROL |
+| `power.rs` | logind `sleep:idle` + GNOME suspend inhibitors while streaming |
+| `tray.rs`, `menu.rs` | StatusNotifierItem + dbusmenu, pairing notification |
+| `desktop.rs` | session detection and the backend choice |
+
+Build dependencies (Ubuntu): `build-essential pkg-config clang libpipewire-0.3-dev`,
+plus `libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev` for `--features gstreamer`.
+D-Bus is spoken by `zbus` (pure Rust, run with `async-io` on plain threads, never
+inside the tokio runtime). Environment overrides: `SIDECAST_LINUX_BACKEND=mutter|portal`,
+`SIDECAST_TEXT_INPUT=keysyms|unicode-entry`.
+
+`scripts/linux-e2e.sh` (`make e2e-linux`, and the CI job "Linux host on headless
+GNOME") starts `mutter --headless --virtual-monitor 1280x720`, PipeWire and
+WirePlumber on a private `dbus-run-session`, stand-ins for the notification
+daemon and the tray watcher (`scripts/linux-e2e-desktop.py`) and `wev` as a
+Wayland client, then runs the host and three probe sessions. It needs
+`mutter pipewire pipewire-bin wireplumber dbus-daemon libglib2.0-bin python3-gi
+adwaita-icon-theme wev`; no GPU (Mutter renders with llvmpipe) and no root.
 
 ## Conventions
 

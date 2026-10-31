@@ -51,6 +51,11 @@ or dual-licensed with one of those); none is used under a copyleft license.
 | log | MIT OR Apache-2.0 | logging facade |
 | openh264, openh264-sys2 | BSD-2-Clause | software H.264 encoder (optional `openh264` feature) and the probe's decoder |
 | windows, windows-core, windows-implement, windows-interface, windows-result, windows-strings, windows-collections, windows-future, windows-numerics, windows-threading | MIT OR Apache-2.0 | the Windows host's bindings to Win32, Direct3D 11 / DXGI, Media Foundation, WASAPI and the shell (Windows builds only) |
+| zbus, zvariant | MIT | Linux host: D-Bus (Mutter, portals, logind, notifications, the tray icon) |
+| ashpd | MIT | Linux host: the xdg-desktop-portal ScreenCast and RemoteDesktop |
+| pipewire, libspa (and their `-sys` bindings, built with bindgen) | MIT | Linux host: screen capture and the virtual microphone |
+| async-io, futures-lite | Apache-2.0 OR MIT | Linux host: running D-Bus calls on plain threads |
+| gstreamer, gstreamer-app (and glib, gio bindings) | MIT OR Apache-2.0 / MIT | Linux host: hardware H.264 (optional `gstreamer` feature) |
 
 ### Not included: drivers the Windows host can use
 
@@ -62,6 +67,17 @@ releases) for a virtual monitor, and a virtual audio cable such as **VB-CABLE**
 microphone. CI downloads the driver's official release and **nefcon**
 (https://github.com/nefarius/nefcon, MIT License) to install it on a throwaway
 test runner; neither ends up in what Sidecast builds.
+
+### Linux system libraries
+
+The Linux host links dynamically to the system's **libpipewire** (MIT) and,
+with the `gstreamer` feature, to **GStreamer** and **GLib** (LGPL-2.1 or
+later). The LGPL libraries are only linked dynamically, never bundled or
+modified, so users can replace them; the encoder elements used are the
+VA-API and NVENC plugins of GStreamer (LGPL), never x264 or another GPL
+element. D-Bus is spoken by zbus in Rust (no libdbus). Building needs
+libclang (Apache-2.0 WITH LLVM-exception) for the PipeWire bindings; it is
+not part of the binary.
 
 ### OpenH264
 

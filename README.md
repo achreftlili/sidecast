@@ -13,7 +13,7 @@ Free and open source (Apache 2.0). No account, no cloud, no telemetry: the phone
 
 The Mac creates a virtual monitor, captures it with ScreenCaptureKit, encodes it with the hardware HEVC/H.264 encoder and streams it over TLS. The phone decodes it full screen and sends touches back as mouse and keyboard input. Design decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Wire protocol: [docs/PROTOCOL.md](docs/PROTOCOL.md). Where it's going (Windows, Linux, iOS): [docs/ROADMAP.md](docs/ROADMAP.md).
 
-**Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone, or an iPhone / iPad with iOS 17 or later (see [iPhone / iPad](#iphone--ipad)). A Windows 10/11 PC works too, experimentally: see [Windows computer](#windows-computer-experimental).
+**Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone, or an iPhone / iPad with iOS 17 or later (see [iPhone / iPad](#iphone--ipad)). A Windows 10/11 PC works too, experimentally: see [Windows computer](#windows-computer-experimental). A Linux computer with GNOME on Wayland works too, experimentally: see [Linux computer](#linux-computer-experimental).
 
 ## How Sidecast compares
 
@@ -112,6 +112,30 @@ It checks the tools, builds Sidecast, installs it for your account in `%LOCALAPP
 
 `sidecast-host.exe --diagnose` (in the install folder) lists what Sidecast found: monitors, the driver, encoders and an audio cable; `sidecast-host.exe` alone runs it with a console log. Pairings and settings live in `%APPDATA%\Sidecast`, the log in `%LOCALAPPDATA%\Sidecast\sidecast.log`. Details: [rust/README.md](rust/README.md).
 
+### Linux computer (experimental)
+
+Ubuntu (or another distribution) with **GNOME on Wayland**, the default session of Ubuntu 22.04 and later. The phone gets a real extra monitor through GNOME's own screen-cast API, touches and the keyboard go through GNOME's remote-desktop API, and the phone's microphone becomes a "Sidecast Microphone" input. It works with the same phone app, but it is new: it has been tested end to end on a headless GNOME in CI, **not yet on a real desktop with a real phone**. Reports are welcome.
+
+```bash
+sudo apt install build-essential pkg-config clang libpipewire-0.3-dev
+# optional, hardware encoding (VA-API / NVENC) instead of OpenH264 on the CPU:
+sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-bad
+curl -sSf https://sh.rustup.rs | sh     # Rust, if you don't have it
+make doctor
+make install-linux                      # AUTOSTART=1 make install-linux to start it at login
+```
+
+`make install-linux` builds the host and installs `~/.local/bin/sidecast-host` and a **Sidecast** entry in the app grid. Start it from there (or run `sidecast-host` in a terminal to see its log). On the phone, add the computer as usual; the 6-digit code appears as a notification, in the tray menu and in the log. Ubuntu shows the tray icon (status, paired phones with **Forget**, **Quit**) through its AppIndicator extension; on plain GNOME install the "AppIndicator and KStatusNotifierItem Support" extension, or use `--no-tray`.
+
+Good to know:
+- GNOME shows its "screen is being shared" indicator while a phone is connected. The virtual monitor appears to the right of your screens at 200 % (100 % if you turned HiDPI off on the phone); you can move it or change its scale in **Settings → Displays** while it is connected.
+- **3/4-finger swipes**: left/right switch workspaces (Super+Page Down/Up), up opens the Activities overview, down switches to the app's next window (Alt+\`, GNOME has no App Exposé).
+- **Typing**: ASCII is typed directly; other characters (é, emoji) use GNOME's Ctrl+Shift+U Unicode entry, which works in GTK, Qt, Firefox and Chromium apps. If your keyboard layout has keys for them, `SIDECAST_TEXT_INPUT=keysyms sidecast-host` types them directly instead.
+- **Microphone**: choose "Sidecast Microphone" in Settings → Sound or in the app; the phone records only while an app listens.
+- **Keeps the computer awake** while a phone is connected (systemd-logind); the screen lock and closing the lid behave as usual.
+- **Other desktops**: on KDE Plasma 6 and wlroots compositors (Sway, Hyprland…) the host uses the desktop portal instead, which asks before sharing (a virtual monitor where the portal offers one, otherwise it mirrors a screen); this path is untested. **X11 sessions are not supported** yet.
+- Uninstall: `scripts/install-linux.sh --uninstall` (pairings stay in `~/.local/share/sidecast`).
+
 ### Updating
 
 ```bash
@@ -120,7 +144,11 @@ make install-mac
 make install-android   # or: make install-ios
 ```
 
-On Windows: `git pull`, then run `scripts\install-windows.ps1` again (it quits the running copy first). Pairings and settings are kept.
+On Windows: `git pull`, then run `scripts\install-windows.ps1` again (it quits the running copy first).
+
+On Linux: `git pull`, then `make install-linux` again.
+
+Pairings and settings are kept.
 
 ## First run
 
@@ -178,15 +206,15 @@ make test
 
 Runs the Mac (XCTest) and Android (JUnit) unit tests, including the shared protocol test vectors and the iOS client's logic (in SidecastKit). `make test-ios` adds the iOS app's own tests on a simulator. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The Windows and Linux host is built in Rust ([rust/README.md](rust/README.md)): a shared core, the host server, the Windows backends and tray app, and a conformance probe. `make test-rust` runs its tests and `make conformance` checks every probe against every host (the Rust host, and on macOS the Mac app) in test-pattern mode. On Windows, `scripts/windows-e2e.sh` (Git Bash) streams a real monitor to the probe.
+The Windows and Linux host is built in Rust ([rust/README.md](rust/README.md)): a shared core, the host server, the Windows backends and tray app, the Linux backends, and a conformance probe. `make test-rust` runs its tests and `make conformance` checks every probe against every host (the Rust host, and on macOS the Mac app) in test-pattern mode. On Windows, `scripts/windows-e2e.sh` (Git Bash) streams a real monitor to the probe; on Linux, `make e2e-linux` runs the real GNOME backend on a headless GNOME (Mutter, PipeWire) against the probe.
 
 ```
 mac/       Swift package: SidecastKit (tested logic, incl. the iOS client's), Sidecast (app), SidecastProbe (CLI test client), mic driver
 android/   Gradle project: protocol/ net/ video/ input/ audio/ store/ ui/
 ios/       iPhone / iPad app (UIKit) on SidecastKit; Sidecast.xcodeproj is generated from project.yml (XcodeGen)
-rust/      Cargo workspace: sidecast-core, sidecast-server, sidecast-host (Windows host and tray app; Linux next), sidecast-probe
+rust/      Cargo workspace: sidecast-core, sidecast-server, sidecast-host (Windows host and tray app, Linux host), sidecast-probe
 docs/      DECISIONS.md, PROTOCOL.md, ROADMAP.md
-scripts/   doctor.sh, conformance.sh, install-windows.ps1, windows-e2e.sh
+scripts/   doctor.sh, conformance.sh, install-windows.ps1, windows-e2e.sh, install-linux.sh, linux-e2e.sh
 dist/      build outputs (gitignored)
 ```
 

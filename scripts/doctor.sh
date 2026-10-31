@@ -131,6 +131,44 @@ else
     hint "Install it with rustup: https://rustup.rs"
 fi
 
+if [[ "$(uname -s)" == Linux ]]; then
+    echo
+    echo "Linux computer (experimental host: make install-linux)"
+    # Warnings only: a Linux machine may be used just to build the phone app.
+    LINUX_PACKAGES=()
+    if command -v pkg-config >/dev/null 2>&1; then
+        ok "pkg-config"
+    else
+        warn "pkg-config missing"; LINUX_PACKAGES+=(pkg-config)
+    fi
+    if command -v cc >/dev/null 2>&1; then ok "C compiler"; else warn "No C compiler"; LINUX_PACKAGES+=(build-essential); fi
+    if pkg-config --exists libpipewire-0.3 2>/dev/null; then
+        ok "PipeWire $(pkg-config --modversion libpipewire-0.3) development files"
+    else
+        warn "PipeWire development files missing (screen capture and the microphone)"; LINUX_PACKAGES+=(libpipewire-0.3-dev)
+    fi
+    if ls /usr/lib/llvm-*/lib/libclang*.so* /usr/lib/*/libclang*.so* >/dev/null 2>&1; then
+        ok "libclang (generates the PipeWire bindings at build time)"
+    else
+        warn "libclang missing (needed to build the PipeWire bindings)"; LINUX_PACKAGES+=(clang libclang-dev)
+    fi
+    if pkg-config --exists gstreamer-1.0 gstreamer-app-1.0 2>/dev/null; then
+        ok "GStreamer $(pkg-config --modversion gstreamer-1.0) (hardware encoding through VA-API / NVENC)"
+    else
+        warn "No GStreamer development files: the host encodes with OpenH264 on the CPU (optional)"
+        hint "For hardware encoding: sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-bad"
+    fi
+    if (( ${#LINUX_PACKAGES[@]} > 0 )); then
+        hint "Install with: sudo apt install ${LINUX_PACKAGES[*]}"
+    fi
+    case "${XDG_SESSION_TYPE:-}:${XDG_CURRENT_DESKTOP:-}" in
+        wayland:*GNOME*) ok "GNOME on Wayland (${XDG_CURRENT_DESKTOP}): the supported desktop" ;;
+        wayland:*) warn "Wayland but not GNOME (${XDG_CURRENT_DESKTOP:-unknown}): the host uses the desktop portal, which asks before sharing (less tested)" ;;
+        x11:*) warn "An X11 session: not supported yet"; hint "Log out, pick \"Ubuntu\" (Wayland) with the gear on the login screen" ;;
+        *) warn "No graphical session detected here (over SSH?): run make doctor in the desktop session" ;;
+    esac
+fi
+
 echo
 if (( FAILED )); then
     echo "Fix the ✗ items above, then run 'make doctor' again."
@@ -138,7 +176,10 @@ if (( FAILED )); then
 fi
 if [[ "$(uname -s)" == Darwin ]]; then
     echo "Ready. Next: make install-mac, then make install-android (or make install-ios) with the phone connected."
+elif [[ "$(uname -s)" == Linux ]]; then
+    echo "Ready to build the Android app: make install-android with the phone connected."
+    echo "This computer as the host (experimental, GNOME on Wayland): make install-linux."
 else
     echo "Ready to build the Android app: make install-android with the phone connected."
-    echo "(The computer side runs on macOS for now; Windows and Linux are on the roadmap.)"
+    echo "This computer as the host (experimental): see \"Windows computer\" in the README (scripts/install-windows.ps1)."
 fi
