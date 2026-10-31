@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Sidecast",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v15), .iOS(.v17)],
     products: [
         .executable(name: "Sidecast", targets: ["Sidecast"]),
         .executable(name: "sidecast-probe", targets: ["SidecastProbe"]),
