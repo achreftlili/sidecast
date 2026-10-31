@@ -18,6 +18,10 @@ pub struct Options {
     pub fps: Option<i64>,
     pub max_mbps: Option<i64>,
     pub name: Option<String>,
+    /// Stream this existing monitor instead of a virtual display (overrides the saved setting).
+    pub monitor: Option<String>,
+    /// Print what this computer offers the host and exit.
+    pub diagnose: bool,
     /// Test mode: send MIC_CONTROL active:true as soon as a mic-capable phone streams.
     pub test_mic_active: bool,
     pub verbose: bool,
@@ -25,7 +29,8 @@ pub struct Options {
 }
 
 pub const USAGE: &str = "\
-Usage: sidecast-host [--data-dir DIR] [--port N] [--name NAME] [--no-mdns] [--verbose]
+Usage: sidecast-host [--data-dir DIR] [--port N] [--name NAME] [--monitor NAME] [--no-mdns] [--verbose]
+       sidecast-host --diagnose
        sidecast-host --test-pattern --data-dir DIR [--port N] [--test-pairing-code 123456]
                      [--no-mdns] [--fps 30|60|120] [--max-mbps N] [--test-mic-active] [--verbose]
 
@@ -36,6 +41,10 @@ Usage: sidecast-host [--data-dir DIR] [--port N] [--name NAME] [--no-mdns] [--ve
   --test-pairing-code C every pairing uses this code (test pattern only)
   --no-mdns             do not advertise _sidecast._tcp (alias: --no-bonjour)
   --name NAME           name shown on the phone (default: this computer's name)
+  --monitor NAME        stream this existing monitor instead of a virtual display
+                        (Windows: a device name such as \\\\.\\DISPLAY2, or `primary`)
+  --diagnose            list the monitors, virtual display driver, encoders and virtual
+                        audio cable this computer offers, then exit
   --fps N, --max-mbps N stream settings for this run
   --test-mic-active     ask a mic-capable phone for its microphone at once (test pattern)
   --verbose             debug logging, including every TOUCH MOVE";
@@ -83,6 +92,14 @@ impl Options {
                     o.max_mbps = Some(mbps.ok_or_else(|| OptionError("--max-mbps must be 10…100".into()))?);
                 }
                 "--name" => o.name = Some(value(&arg, &mut it)?),
+                "--monitor" => {
+                    let monitor = value(&arg, &mut it)?.trim().to_owned();
+                    if monitor.is_empty() {
+                        return Err(OptionError("--monitor needs a monitor name".into()));
+                    }
+                    o.monitor = Some(monitor);
+                }
+                "--diagnose" => o.diagnose = true,
                 "--test-mic-active" => o.test_mic_active = true,
                 "--verbose" | "-v" => o.verbose = true,
                 "--help" | "-h" => o.help = true,
@@ -132,6 +149,14 @@ mod tests {
         assert_eq!(o.port, Some(47895));
         assert_eq!(o.fps, Some(30));
         assert_eq!(o.test_pairing_code.unwrap().digits(), "123456");
+    }
+
+    #[test]
+    fn host_flags() {
+        let o = parse(&["--monitor", r"\\.\DISPLAY2", "--diagnose"]).unwrap();
+        assert_eq!(o.monitor.as_deref(), Some(r"\\.\DISPLAY2"));
+        assert!(o.diagnose && !o.test_pattern);
+        assert!(parse(&["--monitor", " "]).is_err());
     }
 
     #[test]

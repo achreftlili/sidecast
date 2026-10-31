@@ -35,6 +35,8 @@ subtle = "2.6"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
 unicode-segmentation = "1.12"
+# Win32, Direct3D 11 / DXGI, Media Foundation and WASAPI bindings for the Windows host (Microsoft, MIT OR Apache-2.0).
+windows = "0.62"
 
 [workspace.lints.rust]
 # Platform backends that need FFI opt in locally with `#[allow(unsafe_code)]`.
