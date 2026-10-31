@@ -200,40 +200,81 @@ fn chroma(r: i32, g: i32, b: i32) -> (u8, u8) {
     (u.clamp(16, 240) as u8, v.clamp(16, 240) as u8)
 }
 
+/// Where a picture of `source` size lands inside `dest` when it keeps its
+/// shape: centred, as large as fits (letterbox or pillarbox bars around it).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Fit {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Fit {
+    pub fn new(source: (f64, f64), dest: (f64, f64)) -> Fit {
+        if source.0 <= 0.0 || source.1 <= 0.0 || dest.0 <= 0.0 || dest.1 <= 0.0 {
+            return Fit { x: 0.0, y: 0.0, width: dest.0.max(0.0), height: dest.1.max(0.0) };
+        }
+        let scale = (dest.0 / source.0).min(dest.1 / source.1);
+        let (width, height) = (source.0 * scale, source.1 * scale);
+        Fit { x: (dest.0 - width) / 2.0, y: (dest.1 - height) / 2.0, width, height }
+    }
+}
+
 /// Converts `frame` to I420 of `out_width × out_height` (even sizes; odd ones
-/// are rounded down), resizing with nearest-neighbour sampling when the sizes
-/// differ. Chroma is the average of each 2×2 block.
+/// are rounded down). A frame of another size is resized with nearest-neighbour
+/// sampling and keeps its shape: black bars fill the rest (a mirrored monitor
+/// of another shape than the phone). Chroma is the average of each 2×2 block.
 pub fn to_i420(frame: &FrameStore, out_width: usize, out_height: usize) -> I420Planes {
     let (w, h) = (out_width & !1, out_height & !1);
     let (cw, ch) = (w / 2, h / 2);
-    let mut planes = I420Planes { width: w, height: h, y: vec![0; w * h], u: vec![0; cw * ch], v: vec![0; cw * ch] };
+    // Black, video range.
+    let planes = I420Planes { width: w, height: h, y: vec![16; w * h], u: vec![128; cw * ch], v: vec![128; cw * ch] };
     if w == 0 || h == 0 || frame.width == 0 || frame.height == 0 {
         return planes;
     }
-    // Source column (byte offset) and row of every output column / row.
-    let columns: Vec<usize> = (0..w).map(|x| (x * frame.width / w).min(frame.width - 1) * 4).collect();
-    let rows: Vec<usize> = (0..h).map(|y| (y * frame.height / h).min(frame.height - 1)).collect();
+    // The picture's rectangle, on even pixels so every 2×2 block is all picture or all bar.
+    let fit = Fit::new((frame.width as f64, frame.height as f64), (w as f64, h as f64));
+    let even = |v: f64| (v.round() as usize) & !1;
+    let (x0, y0) = (even(fit.x).min(w), even(fit.y).min(h));
+    let (pw, ph) = (even(fit.width).clamp(2, w - x0), even(fit.height).clamp(2, h - y0));
+    if (w - pw) <= 2 && (h - ph) <= 2 {
+        // Same shape (a rounding pixel of difference is not worth a bar).
+        return convert(frame, planes, (0, 0), (w, h));
+    }
+    convert(frame, planes, (x0, y0), (pw, ph))
+}
+
+/// Draws `frame` scaled into the `size` rectangle at `origin` (even values) of `planes`.
+fn convert(frame: &FrameStore, mut planes: I420Planes, origin: (usize, usize), size: (usize, usize)) -> I420Planes {
+    let (w, cw) = (planes.width, planes.width / 2);
+    let ((x0, y0), (pw, ph)) = (origin, size);
+    // Source column (byte offset) and row of every output column / row of the picture.
+    let columns: Vec<usize> = (0..pw).map(|x| (x * frame.width / pw).min(frame.width - 1) * 4).collect();
+    let rows: Vec<usize> = (0..ph).map(|y| (y * frame.height / ph).min(frame.height - 1)).collect();
     let (ro, go, bo) = frame.layout.offsets();
     let stride = frame.width * 4;
-    for cy in 0..ch {
-        let top = &frame.data[rows[2 * cy] * stride..][..stride];
-        let bottom = &frame.data[rows[2 * cy + 1] * stride..][..stride];
-        let (y_top, y_bottom) = planes.y[2 * cy * w..(2 * cy + 2) * w].split_at_mut(w);
-        for cx in 0..cw {
+    for by in 0..ph / 2 {
+        let top = &frame.data[rows[2 * by] * stride..][..stride];
+        let bottom = &frame.data[rows[2 * by + 1] * stride..][..stride];
+        let row = y0 + 2 * by;
+        let (y_top, y_bottom) = planes.y[row * w..(row + 2) * w].split_at_mut(w);
+        for bx in 0..pw / 2 {
             let (mut r, mut g, mut b) = (0i32, 0i32, 0i32);
-            for (dx, column) in [columns[2 * cx], columns[2 * cx + 1]].into_iter().enumerate() {
+            for (dx, column) in [columns[2 * bx], columns[2 * bx + 1]].into_iter().enumerate() {
                 for (line, out) in [(top, &mut *y_top), (bottom, &mut *y_bottom)] {
                     let p = &line[column..column + 4];
                     let (pr, pg, pb) = (p[ro] as i32, p[go] as i32, p[bo] as i32);
-                    out[2 * cx + dx] = luma(pr, pg, pb);
+                    out[x0 + 2 * bx + dx] = luma(pr, pg, pb);
                     r += pr;
                     g += pg;
                     b += pb;
                 }
             }
             let (u, v) = chroma((r + 2) / 4, (g + 2) / 4, (b + 2) / 4);
-            planes.u[cy * cw + cx] = u;
-            planes.v[cy * cw + cx] = v;
+            let c = (y0 / 2 + by) * cw + x0 / 2 + bx;
+            planes.u[c] = u;
+            planes.v[c] = v;
         }
     }
     planes
@@ -352,8 +393,28 @@ mod tests {
         let small = to_i420(&frame, 2, 2);
         assert_eq!(small.y, [luma(255, 0, 0), luma(0, 255, 0), luma(0, 0, 255), luma(255, 255, 255)]);
         // Upscaling repeats pixels.
-        let big = to_i420(&solid(2, 2, PixelLayout::Bgrx, (255, 255, 255)), 6, 4);
-        assert!(big.y.iter().all(|&y| y == 235) && big.y.len() == 24);
+        let big = to_i420(&solid(2, 2, PixelLayout::Bgrx, (255, 255, 255)), 6, 6);
+        assert!(big.y.iter().all(|&y| y == 235) && big.y.len() == 36);
+    }
+
+    #[test]
+    fn other_shapes_keep_their_shape_between_black_bars() {
+        assert_eq!(
+            Fit::new((1920.0, 1080.0), (2400.0, 1080.0)),
+            Fit { x: 240.0, y: 0.0, width: 1920.0, height: 1080.0 }
+        );
+        assert_eq!(Fit::new((1000.0, 1000.0), (200.0, 100.0)), Fit { x: 50.0, y: 0.0, width: 100.0, height: 100.0 });
+        assert_eq!(Fit::new((0.0, 10.0), (20.0, 10.0)).width, 20.0, "degenerate source: the whole destination");
+        // A white 4:3 picture in a 2:1 frame: white in the middle, black (16) pillars.
+        let p = to_i420(&solid(8, 6, PixelLayout::Bgrx, (255, 255, 255)), 16, 8);
+        let row: Vec<u8> = p.y[..16].to_vec();
+        assert_eq!(&row[..2], &[16, 16], "left bar");
+        assert!(row[4..12].iter().all(|&y| y == 235), "picture");
+        assert_eq!(&row[14..], &[16, 16], "right bar");
+        assert!(p.u.iter().chain(&p.v).all(|&c| c == 128));
+        // A one-pixel difference in shape is no reason for a bar.
+        let close = to_i420(&solid(1920, 1080, PixelLayout::Bgrx, (255, 255, 255)), 1920, 1082);
+        assert!(close.y.iter().all(|&y| y == 235));
     }
 
     #[test]

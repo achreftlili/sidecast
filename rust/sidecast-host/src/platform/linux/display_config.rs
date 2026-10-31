@@ -76,6 +76,30 @@ pub async fn connectors(connection: &zbus::Connection) -> Vec<String> {
     layout(&proxy).await.map(|l| l.monitors.into_iter().map(|m| m.connector).collect()).unwrap_or_default()
 }
 
+/// One line per monitor for `--diagnose`: connector, mode, scale, primary.
+pub async fn describe(connection: &zbus::Connection) -> Result<Vec<String>, String> {
+    let proxy = DisplayConfigProxy::new(connection).await.map_err(|e| e.to_string())?;
+    let layout = layout(&proxy).await.map_err(|e| format!("DisplayConfig: {e}"))?;
+    Ok(layout
+        .monitors
+        .iter()
+        .map(|m| {
+            let logical = layout.logical.iter().find(|l| l.connectors.contains(&m.connector));
+            let mode = m.current_mode.as_ref().map_or("off".to_owned(), |(_, w, h)| format!("{w}x{h}"));
+            let scale = logical.map(|l| format!(" at {:.0} %", l.scale * 100.0)).unwrap_or_default();
+            let primary = if logical.is_some_and(|l| l.primary) { ", primary" } else { "" };
+            format!("{} {mode}{scale}{primary}", m.connector)
+        })
+        .collect())
+}
+
+/// The existing monitor `name` (a connector or `primary`) designates.
+pub async fn find_monitor(connection: &zbus::Connection, name: &str) -> Result<monitors::ChosenMonitor, String> {
+    let proxy = DisplayConfigProxy::new(connection).await.map_err(|e| e.to_string())?;
+    let layout = layout(&proxy).await.map_err(|e| format!("DisplayConfig: {e}"))?;
+    monitors::find_monitor(&layout.logical, &layout.monitors, name)
+}
+
 /// The monitor Sidecast added: its connector and its place in the desktop.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewMonitor {

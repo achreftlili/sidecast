@@ -60,7 +60,7 @@ mod imp {
     }
 
     /// The backends for this session: GNOME's own APIs, else the portal.
-    pub fn backends(_options: &PlatformOptions) -> Result<Backends, BackendError> {
+    pub fn backends(options: &PlatformOptions) -> Result<Backends, BackendError> {
         let session = desktop::session_kind(
             env("XDG_SESSION_TYPE").as_deref(),
             env("WAYLAND_DISPLAY").as_deref(),
@@ -96,12 +96,15 @@ mod imp {
         }
         let mut backends = match kind {
             BackendKind::Mutter => {
-                let backend = Arc::new(MutterBackend::new(connection.clone(), text_input));
+                let backend = Arc::new(MutterBackend::new(connection.clone(), text_input, options.monitor.clone()));
                 let mut backends = Backends::new(backend.clone(), Vec::new());
                 backends.input = Some(backend);
                 backends
             }
             BackendKind::Portal => {
+                if let Some(monitor) = options.monitor.get() {
+                    log::info!("linux: the portal's dialog picks the screen; --monitor {monitor} is ignored");
+                }
                 let backend = Arc::new(PortalBackend::new(connection.clone(), text_input));
                 let mut backends = Backends::new(backend.clone(), Vec::new());
                 backends.input = Some(backend);
@@ -137,6 +140,12 @@ mod imp {
                     if mutter { "available" } else { "not on the session bus" },
                     desktop::choose_backend(None, mutter).name()
                 ));
+                if let Ok(monitors) = zbus::block_on(super::display_config::describe(&connection)) {
+                    report.push_str("Monitors (for --monitor):\n");
+                    for line in monitors {
+                        report.push_str(&format!("  {line}\n"));
+                    }
+                }
             }
             Err(error) => report.push_str(&format!("No D-Bus session bus: {error}\n")),
         }

@@ -195,10 +195,10 @@ directly; elsewhere on Wayland to the xdg-desktop-portal; X11 is refused.
 
 | Module | Does |
 |---|---|
-| `mutter.rs` | `org.gnome.Mutter.RemoteDesktop` session + linked `ScreenCast` `RecordVirtual` (cursor as metadata): the virtual monitor, sized by the PipeWire format we ask for; input calls on that session |
-| `display_config.rs`, `monitors.rs` | 200 % scale for a HiDPI plan through `DisplayConfig.ApplyMonitorsConfig` (temporary, other monitors unchanged) |
+| `mutter.rs` | `org.gnome.Mutter.RemoteDesktop` session + linked `ScreenCast` `RecordVirtual` (cursor as metadata): the virtual monitor, sized by the PipeWire format we ask for, or `RecordMonitor` for `--monitor`; input calls on that session |
+| `display_config.rs`, `monitors.rs` | 200 % scale for a HiDPI plan through `DisplayConfig.ApplyMonitorsConfig` (temporary, other monitors unchanged); the monitor `--monitor` names; `--diagnose`'s monitor list |
 | `portal.rs` | the same through `ashpd`: RemoteDesktop + ScreenCast portal, virtual source where offered, else a monitor |
-| `capture.rs`, `pixels.rs` | the PipeWire stream (SHM/MemFd BGRx…), I420 conversion with the composited pointer, flow control, static-screen repeats |
+| `capture.rs`, `pixels.rs` | the PipeWire stream (SHM/MemFd BGRx…), I420 conversion with the composited pointer and letterboxing, flow control, static-screen repeats |
 | `remote_input.rs`, `translate.rs`, `keymap.rs` | `InputEvent` → RemoteDesktop calls on a worker thread: evdev keys/buttons, keysyms, finger scroll, GNOME shortcuts |
 | `gst_encoder.rs` | `gstreamer` feature: `nvh264enc` / `vah264enc` / `vah264lpenc` / `vaapih264enc` → Annex-B |
 | `mic.rs` | "Sidecast Microphone", a PipeWire `Audio/Source` fed from the jitter buffer; Streaming ⇔ MIC_CONTROL |

@@ -11,7 +11,8 @@
 # picture, keyframe requests, touches/keys/text accepted by Mutter's
 # RemoteDesktop (the pointer metadata follows the injected taps; a Wayland
 # client receives the keys), trackpad CURSOR from the compositor, the PipeWire
-# microphone (an app records the phone's 440 Hz tone), the tray menu and Quit.
+# microphone (an app records the phone's 440 Hz tone), the tray menu and Quit,
+# and an existing monitor mirrored with --monitor (letterboxed, input mapped).
 #
 # Needs (Ubuntu): mutter pipewire pipewire-bin wireplumber dbus-daemon python3 python3-gi
 # and, for the keyboard check, wev. Ports: SIDECAST_E2E_PORT (default 47890).
@@ -97,6 +98,11 @@ if command -v wev >/dev/null; then
     wait_for 10 grep -q "xdg_toplevel.*configure: width: [1-9]" "$WORK/wev.log" && HAVE_WEV=1
 fi
 
+"$HOST_BIN" --diagnose >"$WORK/diagnose.txt" 2>&1
+sed 's/^/    /' "$WORK/diagnose.txt"
+check "--diagnose finds Mutter and lists its monitors" \
+    bash -c "grep -q 'Backend: mutter' '$WORK/diagnose.txt' && grep -q 'Meta-0 1280x720 at 100 %, primary' '$WORK/diagnose.txt'"
+
 step "sidecast-host with the GNOME backend (port $PORT)"
 "$HOST_BIN" --data-dir "$WORK/host" --port "$PORT" --no-mdns --verbose >"$WORK/host.log" 2>&1 &
 HOST_PID=$!
@@ -156,9 +162,9 @@ check "touch → button press and release" bash -c "grep -q 'input: button 0x110
 check "3-finger swipe left → Super+Page Down (keycodes 125, 109)" \
     bash -c "grep -q 'input: keycode 125 down' '$WORK/host.log' && grep -q 'input: keycode 109 down' '$WORK/host.log'"
 check "scroll → smooth axis events with a finish" grep -q "input: scroll (0.0, 0.0) finish" "$WORK/host.log"
-pointer_follows() {
+pointer_follows() { # pointer_follows [HOST_LOG]
     # The last injected motion and the pointer Mutter reports in the stream's metadata agree.
-    python3 - "$WORK/host.log" <<'EOF'
+    python3 - "${1:-$WORK/host.log}" <<'EOF'
 import re, sys
 log = open(sys.argv[1]).read()
 moves = re.findall(r"input: motion to \(([\d.]+), ([\d.]+)\) px", log)
@@ -241,6 +247,36 @@ gdbus call --session --dest "$TRAY_NAME" --object-path /MenuBar --method com.can
     6 clicked '<int32 0>' 0 >/dev/null 2>&1
 quit_by_tray() { wait_for 10 bash -c "! kill -0 $HOST_PID" && grep -q "Quit chosen in the tray" "$WORK/host.log"; }
 check "Quit in the tray stops the host" quit_by_tray
+
+step "5. Mirroring an existing monitor (--monitor Meta-0), letterboxed on the phone"
+"$HOST_BIN" --data-dir "$WORK/host" --port "$PORT" --no-mdns --no-tray --verbose --monitor Meta-0 \
+    >"$WORK/host-mirror.log" 2>&1 &
+PIDS+=("$!")
+if wait_for 20 grep -q "listening on port" "$WORK/host-mirror.log"; then
+    probe --seconds 4 --save-frame "$WORK/mirror.pgm" --gesture tap >"$WORK/probe-5.log" 2>&1
+    PROBE_5=$?
+else
+    PROBE_5=1
+fi
+grep -E "STREAM_CONFIG|RESULT|FAILURE" "$WORK/probe-5.log" | sed 's/^/    /'
+check "probe: AUTH, mirrored stream decoded, no violation" test "$PROBE_5" -eq 0
+check "Mutter mirrors Meta-0 (1280x720)" grep -q "mutter: mirroring monitor Meta-0 (1280x720 px)" "$WORK/host-mirror.log"
+letterboxed() {
+    # 1280×720 in a 1920×864 picture: 1536×864 in the middle, black bars of 192 pixels.
+    python3 - "$WORK/mirror.pgm" <<'EOF'
+import sys
+data = open(sys.argv[1], "rb").read()
+_, size, _, pixels = data.split(b"\n", 3)
+w, h = map(int, size.split())
+column = lambda x: [pixels[y * w + x] for y in range(0, h, 8)]
+bars = column(10) + column(w - 10)
+middle = column(w // 2 - 300) + column(w // 2 + 300)
+print(f"    decoded {w}x{h}: bars luma {min(bars)}..{max(bars)}, picture luma {min(middle)}..{max(middle)}")
+sys.exit(0 if (w, h) == (1920, 864) and max(bars) <= 20 and min(middle) >= 40 else 1)
+EOF
+}
+check "the mirrored picture keeps its shape between black bars" letterboxed
+check "the pointer follows taps on the mirrored monitor" pointer_follows "$WORK/host-mirror.log"
 
 step "Result: ${#PASSED[@]} passed, ${#FAILED[@]} failed (logs in $WORK)"
 for name in "${FAILED[@]+"${FAILED[@]}"}"; do echo "  FAILED: $name"; done

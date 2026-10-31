@@ -7,6 +7,7 @@ use sidecast_core::input::{InputEvent, MouseButton, PointerEventKind, ScrollPhas
 use sidecast_core::{Point, Size};
 
 use super::keymap::{self, TextInput, TextStep, evdev};
+use super::pixels::Fit;
 
 /// One call on the remote-desktop session. Positions are in stream pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,7 +45,9 @@ pub enum RemoteCall {
 }
 
 /// Maps display points (the server's coordinate space) to the stream's pixels
-/// and tracks what is held, so `release_all` can undo it.
+/// and tracks what is held, so `release_all` can undo it. A stream of another
+/// shape than the display (a mirrored monitor) sits between bars, as
+/// `pixels::to_i420` draws it; touches on a bar land on its edge.
 #[derive(Debug, Clone)]
 pub struct Translator {
     display: Size,
@@ -62,26 +65,29 @@ impl Translator {
         Translator { display, stream, text, last_motion: None, buttons: Vec::new(), keys: Vec::new(), scrolling: false }
     }
 
-    fn scale(&self) -> (f64, f64) {
+    /// The stream's rectangle in display points and stream pixels per point.
+    fn placement(&self) -> (Fit, f64) {
+        let stream = (self.stream.0 as f64, self.stream.1 as f64);
         if !self.display.is_usable() || self.stream.0 == 0 || self.stream.1 == 0 {
-            return (1.0, 1.0);
+            return (Fit { x: 0.0, y: 0.0, width: stream.0, height: stream.1 }, 1.0);
         }
-        (self.stream.0 as f64 / self.display.width, self.stream.1 as f64 / self.display.height)
+        let fit = Fit::new(stream, (self.display.width, self.display.height));
+        (fit, stream.0 / fit.width)
     }
 
     /// A display point in stream pixels, clamped onto the stream.
     pub fn to_stream(&self, p: Point) -> (f64, f64) {
-        let (sx, sy) = self.scale();
+        let (fit, scale) = self.placement();
         let max_x = (self.stream.0.max(1) - 1) as f64;
         let max_y = (self.stream.1.max(1) - 1) as f64;
-        ((p.x * sx).clamp(0.0, max_x), (p.y * sy).clamp(0.0, max_y))
+        (((p.x - fit.x) * scale).clamp(0.0, max_x), ((p.y - fit.y) * scale).clamp(0.0, max_y))
     }
 
     /// Stream pixels in display points, or `None` when outside the stream.
     pub fn to_display(&self, x: f64, y: f64) -> Option<Point> {
-        let (sx, sy) = self.scale();
+        let (fit, scale) = self.placement();
         let inside = x >= 0.0 && y >= 0.0 && x < self.stream.0 as f64 && y < self.stream.1 as f64;
-        inside.then(|| Point::new(x / sx, y / sy))
+        inside.then(|| Point::new(fit.x + x / scale, fit.y + y / scale))
     }
 
     /// Where the last injected motion put the pointer, in display points.
@@ -248,6 +254,18 @@ mod tests {
         assert_eq!(flat.to_stream(Point::new(12.5, 7.0)), (12.5, 7.0));
         let odd = Translator::new(Size::ZERO, (100, 100), TextInput::Keysyms);
         assert_eq!(odd.to_stream(Point::new(5.0, 5.0)), (5.0, 5.0));
+    }
+
+    #[test]
+    fn a_mirrored_monitor_of_another_shape_sits_between_bars() {
+        // A 1920×1080 monitor on a 1200×540-point display: 960×540 points wide, bars of 120 points.
+        let t = Translator::new(Size::new(1200.0, 540.0), (1920, 1080), TextInput::Keysyms);
+        assert_eq!(t.to_stream(Point::new(120.0, 0.0)), (0.0, 0.0), "the picture's top-left corner");
+        assert_eq!(t.to_stream(Point::new(600.0, 270.0)), (960.0, 540.0), "the centre");
+        assert_eq!(t.to_stream(Point::new(10.0, 300.0)), (0.0, 600.0), "a touch on the left bar lands on the edge");
+        assert_eq!(t.to_stream(Point::new(1199.0, 539.0)), (1919.0, 1078.0));
+        assert_eq!(t.to_display(960.0, 540.0), Some(Point::new(600.0, 270.0)));
+        assert_eq!(t.to_display(0.0, 0.0), Some(Point::new(120.0, 0.0)));
     }
 
     #[test]
