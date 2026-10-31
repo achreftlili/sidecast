@@ -79,13 +79,20 @@ pub async fn connectors(connection: &zbus::Connection) -> Vec<String> {
     layout(&proxy).await.map(|l| l.monitors.into_iter().map(|m| m.connector).collect()).unwrap_or_default()
 }
 
+/// The monitor Sidecast added: its connector and its place in the desktop.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewMonitor {
+    pub connector: String,
+    pub position: (i32, i32),
+}
+
 /// Sets the scale of the monitor that appeared since `before` at `size` pixels.
 pub async fn scale_new_monitor(
     connection: &zbus::Connection,
     before: &[String],
     size: (u32, u32),
     scale: f64,
-) -> Result<String, String> {
+) -> Result<NewMonitor, String> {
     let proxy = DisplayConfigProxy::new(connection).await.map_err(|e| e.to_string())?;
     let layout = layout(&proxy).await.map_err(|e| format!("DisplayConfig: {e}"))?;
     if !layout.logical_layout {
@@ -96,6 +103,10 @@ pub async fn scale_new_monitor(
         .connector
         .clone();
     let configs = monitors::with_scale(&layout.logical, &layout.monitors, &monitor, scale)?;
+    let position = configs
+        .iter()
+        .find(|c| c.monitors.iter().any(|(connector, _)| *connector == monitor))
+        .map_or((0, 0), |c| (c.x, c.y));
     let entries: Vec<LogicalEntry<'_>> = configs
         .into_iter()
         .map(|LogicalConfig { x, y, scale, transform, primary, monitors }| {
@@ -107,5 +118,5 @@ pub async fn scale_new_monitor(
         .apply_monitors_config(layout.serial, METHOD_TEMPORARY, entries, HashMap::new())
         .await
         .map_err(|e| format!("ApplyMonitorsConfig: {e}"))?;
-    Ok(monitor)
+    Ok(NewMonitor { connector: monitor, position })
 }
