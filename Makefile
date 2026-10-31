@@ -1,4 +1,4 @@
-.PHONY: all doctor mac mac-signing install-mac android install-android ios install-ios test test-mac test-android test-ios clean
+.PHONY: all doctor mac mac-signing install-mac android install-android ios install-ios test test-mac test-android test-ios rust test-rust conformance clean
 
 # Build both into dist/
 all: mac android
@@ -45,5 +45,16 @@ test-android:
 test-ios:
 	./ios/scripts/build-ios.sh --test
 
+# The Rust workspace (Windows/Linux host, shared core, conformance probe): release build into rust/target/
+rust:
+	cd rust && cargo build --release
+
+test-rust:
+	cd rust && cargo fmt --all --check && cargo clippy --all-targets -- -D warnings && cargo test
+
+# Every probe against every host in test-pattern mode (Rust ↔ Rust; on macOS also Swift ↔ Rust)
+conformance:
+	./scripts/conformance.sh
+
 clean:
-	rm -rf dist mac/.build android/build android/app/build ios/build
+	rm -rf dist mac/.build android/build android/app/build ios/build rust/target
