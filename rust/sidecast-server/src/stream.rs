@@ -687,6 +687,14 @@ fn create_encoder(
     Err(last_error)
 }
 
+/// Drops an event nobody will handle (the session ended), releasing a started
+/// capture the same way a running one is released.
+pub(crate) fn discard(event: StreamEvent) {
+    if let StreamEvent::Started { result: Ok(started), .. } = event {
+        release_capture(started.capture, Some(started.slot));
+    }
+}
+
 /// Tears down a capture (and possibly the virtual display) off the async
 /// runtime; the stream slot is released only afterwards, so the next stream
 /// never overlaps the old display.
