@@ -18,7 +18,7 @@ use sidecast_core::streaming::StreamPlan;
 use sidecast_server::backend::{
     BackendError, CaptureSession, ClientInfo, DisplayBackend, DisplayGeometry, FrameSink, InputBackend, InputSink,
 };
-use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
+use zbus::zvariant::{OwnedObjectPath, Value};
 
 use super::capture::{CaptureConfig, PipeWireCapture, SharedCursor};
 use super::display_config;
@@ -69,8 +69,6 @@ trait ScreenCastSession {
 trait ScreenCastStream {
     #[zbus(signal, name = "PipeWireStreamAdded")]
     fn pipewire_stream_added(&self, node_id: u32) -> zbus::Result<()>;
-    #[zbus(property)]
-    fn parameters(&self) -> zbus::Result<HashMap<String, OwnedValue>>;
 }
 
 /// `NotifyPointerAxis` flags (org.gnome.Mutter.RemoteDesktop.Session).
@@ -97,8 +95,6 @@ struct MutterSession {
     remote: RemoteDesktopSessionProxy<'static>,
     stream_path: String,
     node_id: u32,
-    /// The virtual monitor's place in the desktop (logical pixels), when Mutter says.
-    position: Option<(i32, i32)>,
 }
 
 impl MutterSession {
@@ -158,11 +154,7 @@ impl MutterSession {
             Some(Some(signal)) => *signal.args().map_err(failed("PipeWireStreamAdded"))?.node_id(),
             _ => return Err("Mutter never announced the PipeWire stream".into()),
         };
-        let position = stream.parameters().await.ok().and_then(|p| {
-            let value = p.get("position")?;
-            <(i32, i32)>::try_from(value.try_clone().ok()?).ok()
-        });
-        Ok(MutterSession { remote, stream_path: stream_path.to_string(), node_id, position })
+        Ok(MutterSession { remote, stream_path: stream_path.to_string(), node_id })
     }
 
     fn stop(&self) {
@@ -243,21 +235,31 @@ impl DisplayBackend for MutterBackend {
         // HiDPI: 200 %, so the desktop on the phone has the size of the plan's points
         // (Mutter picks 100 % for a monitor without a physical size).
         let scale = if plan.display.hi_dpi { 2.0 } else { 1.0 };
-        match zbus::block_on(display_config::scale_new_monitor(&self.connection, &monitors_before, capture.size, scale))
-        {
-            Ok(connector) => log::info!("mutter: virtual monitor {connector} at {:.0} %", scale * 100.0),
-            Err(error) => log::warn!("mutter: cannot set the virtual monitor's scale: {error}"),
-        }
+        let position = match zbus::block_on(display_config::scale_new_monitor(
+            &self.connection,
+            &monitors_before,
+            capture.size,
+            scale,
+        )) {
+            Ok(monitor) => {
+                log::info!("mutter: virtual monitor {} at {:.0} %", monitor.connector, scale * 100.0);
+                Some(monitor.position)
+            }
+            Err(error) => {
+                log::warn!("mutter: cannot set the virtual monitor's scale: {error}");
+                None
+            }
+        };
         log::info!(
             "mutter: virtual monitor {}x{} px for {}{} (stream {}, PipeWire node {})",
             capture.size.0,
             capture.size.1,
             client.device_name,
-            session.position.map(|(x, y)| format!(" at ({x}, {y})")).unwrap_or_default(),
+            position.map(|(x, y)| format!(" at ({x}, {y})")).unwrap_or_default(),
             session.stream_path,
             session.node_id
         );
-        let (x, y) = session.position.unwrap_or_default();
+        let (x, y) = position.unwrap_or_default();
         let geometry = DisplayGeometry {
             size: Size::new(plan.display.width as f64, plan.display.height as f64),
             origin: sidecast_core::Point::new(x as f64, y as f64),

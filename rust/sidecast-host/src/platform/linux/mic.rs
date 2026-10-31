@@ -115,7 +115,8 @@ impl VirtualSource {
     fn start(device_name: &str, jitter: Jitter, on_recording: impl Fn(bool) + Send + 'static) -> Result<Self, String> {
         let (stop, stop_rx) = pw::channel::channel();
         let (ready_tx, ready_rx) = mpsc::channel();
-        let device_name = device_name.to_owned();
+        // The phone's name becomes a PipeWire property: no NUL bytes in C strings.
+        let device_name = device_name.replace('\0', "");
         let thread = std::thread::Builder::new()
             .name("sidecast-pipewire-mic".into())
             .spawn(move || {
