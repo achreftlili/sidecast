@@ -27,6 +27,14 @@ jobs:
         working-directory: mac
         run: swift build -c release --arch x86_64
 
+  ios:
+    name: iOS app
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build for the iOS Simulator (unsigned) and run the app's unit tests
+        run: make test-ios
+
   android:
     name: Android app
     runs-on: ubuntu-latest
