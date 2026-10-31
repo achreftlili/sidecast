@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["sidecast-core"]
+members = ["sidecast-core", "sidecast-server", "sidecast-host", "sidecast-probe"]
 
 [workspace.package]
 version = "0.6.0"

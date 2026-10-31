@@ -1,0 +1,37 @@
+[package]
+name = "sidecast-server"
+description = "Sidecast host server: TLS, pairing, session state machine, streaming and the backend traits platform code implements."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Software H.264 encoder (Cisco OpenH264, compiled from source). See THIRD_PARTY_NOTICES.md
+# for its patent note before shipping binaries built with it.
+openh264 = ["dep:openh264", "dep:openh264-sys2"]
+
+[dependencies]
+sidecast-core.workspace = true
+
+gethostname.workspace = true
+if-addrs.workspace = true
+log.workspace = true
+mdns-sd.workspace = true
+openh264 = { workspace = true, optional = true }
+openh264-sys2 = { workspace = true, optional = true }
+rcgen.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true
