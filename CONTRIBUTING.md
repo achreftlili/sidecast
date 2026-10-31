@@ -20,7 +20,7 @@ You can work on the Mac side without a phone: see "Testing without a phone" in t
 - `mac/Sources/Sidecast`: the menu-bar app (server, capture, encoding, virtual display, input injection, UI).
 - `mac/Sources/SidecastMicDriver`: the "Sidecast Microphone" Core Audio driver (C).
 - `android/app/src/main/java/.../`: `protocol/` and `net/` (codec, TLS, session), `video/`, `input/`, `audio/`, `store/`, `ui/`.
-- `rust/`: the Windows/Linux host in Rust: `sidecast-core` (pure, tested logic shared by the new hosts), `sidecast-server` (the host and the backend traits platform code implements), `sidecast-host` (CLI), `sidecast-probe` (conformance client). See [rust/README.md](rust/README.md); `make test-rust` and `make conformance` run its checks (Rust is optional for Mac and Android work).
+- `rust/`: the Windows/Linux host in Rust: `sidecast-core` (pure, tested logic shared by the new hosts), `sidecast-server` (the host and the backend traits platform code implements), `sidecast-host` (the CLI, the Windows backends in `src/platform/windows/` and the Windows tray app in `src/tray/`), `sidecast-probe` (conformance client). See [rust/README.md](rust/README.md); `make test-rust` and `make conformance` run its checks (Rust is optional for Mac and Android work). Windows-only code builds and runs its tests in CI's Windows jobs; on a Windows PC, `scripts/windows-e2e.sh` (Git Bash) also streams a real monitor to the probe.
 - `docs/PROTOCOL.md`: the wire protocol, the contract between the two sides.
 
 ## Ground rules
@@ -34,7 +34,7 @@ You can work on the Mac side without a phone: see "Testing without a phone" in t
 
 ## New platforms
 
-Windows and Linux computers are on the [roadmap](docs/ROADMAP.md); the iOS client is a preview that needs testing on real devices. If you want to work on one, open an issue first so we can agree on the approach. A new client or host is done when it passes the same protocol test vectors and works with the existing apps.
+Linux computers are on the [roadmap](docs/ROADMAP.md); the Windows host is experimental and the iOS client a preview, and both need testing on real devices (Windows: say which GPU, Windows version, and whether the Virtual Display Driver or a monitor was streamed). If you want to work on one, open an issue first so we can agree on the approach. A new client or host is done when it passes the same protocol test vectors and works with the existing apps.
 
 ## Pull requests
 

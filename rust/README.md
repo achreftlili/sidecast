@@ -8,7 +8,7 @@ exactly like the Mac app, so the Android app works with it unchanged.
 |---|---|
 | `sidecast-core` | Pure logic, no I/O: framing and every message, pairing (HMAC proof, codes, tokens), the paired-device model, flow control and adaptive bitrate, stream planning, the gesture engine, keyboard mapping, the microphone jitter buffer, address classification. A port of the Mac's `SidecastKit` with its tests. |
 | `sidecast-server` | The host: TLS (rustls, ring), DNS-SD, the session state machine, streaming with flow control, input timing, microphone routing, persistence. Platform code plugs in through the traits in [`backend.rs`](sidecast-server/src/backend.rs). Optional software H.264 encoder (`openh264` feature). |
-| `sidecast-host` | The command-line host. `--test-pattern` works today on any OS; the Windows and Linux backends are stubs (`src/platform/`) for the next pull requests. |
+| `sidecast-host` | The host program: `sidecast-host` on the command line (`--test-pattern` on any OS) and, on Windows, the `sidecast-tray` notification-area app. The Windows backends are in `src/platform/windows/` (experimental, DECISIONS Q37); Linux is a stub (`src/platform/linux.rs`) for the next pull request. |
 | `sidecast-probe` | A scripted fake phone that checks a host against the protocol and exits non-zero on any violation. |
 
 ## Build and test
@@ -42,13 +42,44 @@ and on macOS also the Swift probe against the Rust host and the Rust probe
 against the Mac app (pairing, AUTH, wrong codes, unknown tokens, codec
 negotiation, data saver, mic, gestures, keyboard, trackpad CURSOR, liveness).
 
+## The Windows host
+
+Install it with `scripts/install-windows.ps1` (README: *Windows computer*), or
+run it from the build folder: `sidecast-tray.exe` (notification-area app, logs
+to `%LOCALAPPDATA%\Sidecast\sidecast.log`) or `sidecast-host.exe` (console).
+Both take the options above; `--monitor \\.\DISPLAY2` (or `primary`) streams an
+existing monitor instead of a virtual one, and `sidecast-host --diagnose` lists
+the monitors, DXGI outputs, Virtual Display Driver, Media Foundation encoders
+and audio devices it finds. `sidecast-tray --quit` asks a running tray app to quit.
+
+| Backend | Windows implementation (`src/platform/windows/`) |
+|---|---|
+| Display | `screen.rs`: a Virtual Display Driver monitor at the phone's resolution while a phone streams (`vdd.rs`, `vdd_config.rs`: its settings file and control pipe; `display.rs`: attach, mode, detach), else an existing monitor |
+| Capture | `capture.rs`: DXGI Desktop Duplication, pointer drawn in, NV12 at the stream's size (`convert.rs`) |
+| Encoders | `encoder.rs`: Media Foundation H.264, the GPU's MFT then Microsoft's software MFT (output normalized by `bitstream.rs`); OpenH264 last |
+| Input | `input.rs`: SendInput (`keymap.rs`: keys and Windows shortcuts; `mapping.rs`: coordinates, wheel, zoom) |
+| Power | `power.rs`: SetThreadExecutionState |
+| Microphone | `mic.rs`: WASAPI into a virtual audio cable's "CABLE Input" while an app records "CABLE Output" (`cable.rs`) |
+| UI | `src/tray/`: icon, menu, pairing code window and notification, Start at login |
+
+The pure modules (`keymap`, `mapping`, `convert`, `bitstream`, `vdd_config`,
+`cable`) build and run their tests on every OS. On Windows, `cargo test` also
+encodes with the Media Foundation encoders it finds and checks keep-awake;
+with `SIDECAST_TEST_REAL_INPUT=1` it moves the real pointer and checks it.
+`scripts/windows-e2e.sh` (Git Bash) streams a real monitor to the probe with
+the real backends (pairing through a test-pattern host first, since fixed
+codes are test-only); `--tray` also smoke-tests the tray app and
+`--expect-virtual-display` requires a Virtual Display Driver monitor. CI runs
+all of it on `windows-latest`, including the driver's signed release.
+
 ## How a platform backend plugs in
 
 A host is a [`Backends`](sidecast-server/src/backend.rs) value passed to
 `sidecast_server::start`. The server owns the protocol, pairing, flow control,
 bitrate, keyframe cadence, gesture recognition and click timing; a backend only
-produces frames and injects input. `sidecast-host/src/platform/{windows,linux}.rs`
-return the platform's `Backends` (today: "not supported yet").
+produces frames and injects input. `sidecast-host/src/platform/windows/mod.rs`
+and `linux.rs` return the platform's `Backends` (Linux: "not supported yet"),
+given the host's `PlatformOptions` (today: which existing monitor to stream).
 
 ```rust
 let mut backends = Backends::new(Arc::new(MyDisplay::new()), vec![Arc::new(MyHardwareEncoder), Arc::new(OpenH264Factory)]);
@@ -115,8 +146,9 @@ origin), already timed (a click is move → 12 ms → press → 40 ms → releas
 - `Zoom { delta }`: pinch steps (positive = zoom in): Ctrl+wheel on Windows/Linux.
 - `Semantic(SemanticAction)`: 3/4-finger swipes. Map `DesktopNext` /
   `DesktopPrevious` (Windows: Win+Ctrl+→/←; GNOME: Super+Page Down/Up),
-  `Overview` (Win+Tab; GNOME Activities) and `AppWindows` (no Windows
-  equivalent yet; GNOME: application windows).
+  `Overview` (Win+Tab; GNOME Activities) and `AppWindows` (Windows has no
+  App Exposé: Win+D, show the desktop, as a precision touchpad's three-finger
+  swipe down; GNOME: application windows).
 - `Key { key, modifiers }`: `Key` is OS-neutral; `Key::is_navigation()` marks
   the keys Windows sends as extended. `KeyModifiers::META` is the Windows/Super key.
 - `Text(String)`: Unicode text, control characters already removed; type it

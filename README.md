@@ -13,7 +13,7 @@ Free and open source (Apache 2.0). No account, no cloud, no telemetry: the phone
 
 The Mac creates a virtual monitor, captures it with ScreenCaptureKit, encodes it with the hardware HEVC/H.264 encoder and streams it over TLS. The phone decodes it full screen and sends touches back as mouse and keyboard input. Design decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Wire protocol: [docs/PROTOCOL.md](docs/PROTOCOL.md). Where it's going (Windows, Linux, iOS): [docs/ROADMAP.md](docs/ROADMAP.md).
 
-**Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone, or an iPhone / iPad with iOS 17 or later (see [iPhone / iPad](#iphone--ipad)).
+**Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone, or an iPhone / iPad with iOS 17 or later (see [iPhone / iPad](#iphone--ipad)). A Windows 10/11 PC works too, experimentally: see [Windows computer](#windows-computer-experimental).
 
 ## How Sidecast compares
 
@@ -89,6 +89,29 @@ It builds the app, installs it and opens it. The first time, iOS asks you to tru
 
 An iPad makes a great second screen: the Apple Pencil works like a finger, and a hardware keyboard types on the computer too. The display screen is landscape and keeps the device awake. iOS doesn't let apps run in the background, so the stream stops when you switch apps and reconnects when you come back.
 
+### Windows computer (experimental)
+
+A Windows 10 or 11 PC can be the computer instead of a Mac, with the same phone apps. It is new: it passes its tests on Windows in CI, but it has not been tried on a real PC with a phone yet, so reports are welcome.
+
+You need Git, **Rust** (`winget install Rustlang.Rustup`) and the **Microsoft C++ build tools** (`winget install Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"`, or *Desktop development with C++* in the Visual Studio Installer). Then, in PowerShell:
+
+```powershell
+git clone https://github.com/achreftlili/sidecast.git
+cd sidecast
+powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
+```
+
+It checks the tools, builds Sidecast, installs it for your account in `%LOCALAPPDATA%\Programs\Sidecast` (no administrator rights), adds it to the Start menu and starts it; add `-Autostart` to start it at login too (or use **Start at login** in its menu). It lives in the notification area: click **^** on the taskbar if the icon is hidden. The first time, **Windows Defender Firewall** asks whether Sidecast may accept connections: allow **Private networks**, and make sure your Wi-Fi is a private network (Settings → Network & internet → Wi-Fi).
+
+- **An extra screen** needs the free, signed [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver/releases): install it from its official release (its *Virtual Driver Control* app installs the driver). Windows only loads drivers signed by Microsoft, so Sidecast doesn't ship one of its own. While a phone is connected, Sidecast turns one of the driver's monitors on at the phone's resolution, to the right of your screens, and turns it off again afterwards. Arrange it and set its scale (e.g. 200 % for a sharp picture) in **Settings → System → Display**; Windows remembers both. The first time a phone uses a new resolution, Sidecast adds it to the driver's settings and restarts the driver, so your screens flicker once.
+- **Without the driver**, the phone shows an existing monitor: a second monitor if you have one, otherwise your main screen (mirroring). Pick one in the menu under **Screen**.
+- **The phone's microphone** needs a virtual audio cable such as [VB-CABLE](https://vb-audio.com/Cable/): Sidecast plays the phone into **CABLE Input**, and Windows apps record **CABLE Output**. The phone records only while an app is listening. Without a cable, the microphone isn't offered.
+- **Gestures** are the Mac's, with Windows shortcuts: three/four-finger swipes left and right switch virtual desktops (Win+Ctrl+←/→), up opens Task View (Win+Tab), down shows the desktop (Win+D); a pinch zooms (Ctrl+wheel).
+- **The menu** shows the status, the address for **Add by IP**, the pairing code (also in a notification and a large window while a phone pairs), **Phone controls this computer**, **Paired phones** (Forget), **Start at login**, **Open log** and **Quit**.
+- Windows lets no app click or type into apps running as administrator, nor capture the sign-in and UAC screens: there the phone's picture pauses and its touches are ignored.
+
+`sidecast-host.exe --diagnose` (in the install folder) lists what Sidecast found: monitors, the driver, encoders and an audio cable; `sidecast-host.exe` alone runs it with a console log. Pairings and settings live in `%APPDATA%\Sidecast`, the log in `%LOCALAPPDATA%\Sidecast\sidecast.log`. Details: [rust/README.md](rust/README.md).
+
 ### Updating
 
 ```bash
@@ -97,7 +120,7 @@ make install-mac
 make install-android   # or: make install-ios
 ```
 
-Pairings and settings are kept.
+On Windows: `git pull`, then run `scripts\install-windows.ps1` again (it quits the running copy first). Pairings and settings are kept.
 
 ## First run
 
@@ -155,15 +178,15 @@ make test
 
 Runs the Mac (XCTest) and Android (JUnit) unit tests, including the shared protocol test vectors and the iOS client's logic (in SidecastKit). `make test-ios` adds the iOS app's own tests on a simulator. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The Windows and Linux host is being built in Rust ([rust/README.md](rust/README.md)): a shared core, the host server and a conformance probe. `make test-rust` runs its tests and `make conformance` checks every probe against every host (the Rust host, and on macOS the Mac app) in test-pattern mode.
+The Windows and Linux host is built in Rust ([rust/README.md](rust/README.md)): a shared core, the host server, the Windows backends and tray app, and a conformance probe. `make test-rust` runs its tests and `make conformance` checks every probe against every host (the Rust host, and on macOS the Mac app) in test-pattern mode. On Windows, `scripts/windows-e2e.sh` (Git Bash) streams a real monitor to the probe.
 
 ```
 mac/       Swift package: SidecastKit (tested logic, incl. the iOS client's), Sidecast (app), SidecastProbe (CLI test client), mic driver
 android/   Gradle project: protocol/ net/ video/ input/ audio/ store/ ui/
 ios/       iPhone / iPad app (UIKit) on SidecastKit; Sidecast.xcodeproj is generated from project.yml (XcodeGen)
-rust/      Cargo workspace: sidecast-core, sidecast-server, sidecast-host (Windows/Linux, test pattern for now), sidecast-probe
+rust/      Cargo workspace: sidecast-core, sidecast-server, sidecast-host (Windows host and tray app; Linux next), sidecast-probe
 docs/      DECISIONS.md, PROTOCOL.md, ROADMAP.md
-scripts/   doctor.sh, conformance.sh
+scripts/   doctor.sh, conformance.sh, install-windows.ps1, windows-e2e.sh
 dist/      build outputs (gitignored)
 ```
 

@@ -50,6 +50,18 @@ or dual-licensed with one of those); none is used under a copyleft license.
 | unicode-segmentation | MIT OR Apache-2.0 | splitting typed text between graphemes |
 | log | MIT OR Apache-2.0 | logging facade |
 | openh264, openh264-sys2 | BSD-2-Clause | software H.264 encoder (optional `openh264` feature) and the probe's decoder |
+| windows, windows-core, windows-implement, windows-interface, windows-result, windows-strings, windows-collections, windows-future, windows-numerics, windows-threading | MIT OR Apache-2.0 | the Windows host's bindings to Win32, Direct3D 11 / DXGI, Media Foundation, WASAPI and the shell (Windows builds only) |
+
+### Not included: drivers the Windows host can use
+
+Sidecast does not include or distribute any driver. On Windows it uses, when
+the user installed them, the **Virtual Display Driver**
+(https://github.com/VirtualDrivers/Virtual-Display-Driver, MIT License, signed
+releases) for a virtual monitor, and a virtual audio cable such as **VB-CABLE**
+(https://vb-audio.com/Cable/, VB-Audio's own license) for the phone's
+microphone. CI downloads the driver's official release and **nefcon**
+(https://github.com/nefarius/nefcon, MIT License) to install it on a throwaway
+test runner; neither ends up in what Sidecast builds.
 
 ### OpenH264
 
@@ -92,4 +104,6 @@ DECISIONS Q33), but anyone who distributes a binary built with the `openh264`
 feature is responsible for any H.264 patent licensing that applies where they
 distribute it. Build with `--no-default-features` to leave OpenH264 out; the
 platform hosts prefer the computer's hardware encoders, whose H.264/HEVC
-licensing comes with the hardware or operating system.
+licensing comes with the hardware or operating system. The Windows host uses
+OpenH264 only after the GPU's Media Foundation encoder and Microsoft's own
+software H.264 encoder, which ships (and is licensed) with Windows.
