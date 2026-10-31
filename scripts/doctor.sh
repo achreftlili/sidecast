@@ -116,6 +116,22 @@ if [[ "$(uname -s)" == Darwin ]]; then
 fi
 
 echo
+echo "Rust (optional: the Windows/Linux host, make test-rust, make conformance)"
+# Warnings only: the Mac and Android apps do not need Rust.
+if command -v cargo >/dev/null 2>&1 && rust_version="$(rustc --version 2>/dev/null)"; then
+    ok "$rust_version"
+    if cargo clippy --version >/dev/null 2>&1 && cargo fmt --version >/dev/null 2>&1; then
+        ok "clippy and rustfmt"
+    else
+        warn "clippy or rustfmt missing (needed for make test-rust)"
+        hint "rustup component add clippy rustfmt"
+    fi
+else
+    warn "No Rust toolchain (needed only for the Rust host, make test-rust and make conformance)"
+    hint "Install it with rustup: https://rustup.rs"
+fi
+
+echo
 if (( FAILED )); then
     echo "Fix the ✗ items above, then run 'make doctor' again."
     exit 1

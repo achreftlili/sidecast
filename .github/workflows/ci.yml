@@ -48,3 +48,49 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Unit tests and release APK (debug-key signed)
         run: make android
+
+  rust:
+    name: Rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-26]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+      # Integration tests pick a free port: Windows may refuse to rebind one with connections in TIME_WAIT.
+      SIDECAST_TEST_PORT: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Rust toolchain (stable, rustfmt, clippy)
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+          rustc --version
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy without OpenH264
+        run: cargo clippy -p sidecast-server -p sidecast-host -p sidecast-probe --no-default-features --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test
+      - name: Host ↔ probe end to end
+        working-directory: .
+        run: ./scripts/conformance.sh --rust-only
+
+  conformance:
+    name: Swift ↔ Rust conformance
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Rust probe ↔ Rust host, Swift probe ↔ Rust host, Rust probe ↔ Mac host
+        run: ./scripts/conformance.sh
