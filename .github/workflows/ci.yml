@@ -85,10 +85,94 @@ jobs:
       - name: Host ↔ probe end to end
         working-directory: .
         run: ./scripts/conformance.sh --rust-only
-      - name: Windows host with its real backends (capture, encoders, input) ↔ probe
+      - name: Windows host with its real backends (capture, encoders, input) and the tray app ↔ probe
         if: runner.os == 'Windows'
         working-directory: .
-        run: ./scripts/windows-e2e.sh
+        run: ./scripts/windows-e2e.sh --tray
+
+  windows-virtual-display:
+    name: Windows installer and virtual display
+    runs-on: windows-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install from source (scripts/install-windows.ps1, Windows PowerShell 5.1)
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1 -InstallDir "$env:RUNNER_TEMP\Sidecast" -NoLaunch
+      - name: Install the Virtual Display Driver (its official signed release, checksums pinned)
+        id: vdd
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $work = Join-Path $env:RUNNER_TEMP 'vdd'
+          New-Item -ItemType Directory -Force $work | Out-Null
+          function Get-Verified([string]$Url, [string]$Sha256, [string]$Out) {
+            Invoke-WebRequest -Uri $Url -OutFile $Out -UseBasicParsing
+            $actual = (Get-FileHash -Algorithm SHA256 $Out).Hash.ToLowerInvariant()
+            if ($actual -ne $Sha256) { throw "checksum mismatch for $Url ($actual)" }
+          }
+          Get-Verified 'https://github.com/VirtualDrivers/Virtual-Display-Driver/releases/download/25.7.23/VirtualDisplayDriver-x86.Driver.Only.zip' `
+            'e24210692b442b39af763536330ce78b423f19342b7a7792c26de3944e418b3a' "$work\vdd.zip"
+          Get-Verified 'https://github.com/nefarius/nefcon/releases/download/v1.21.0/nefcon_v1.21.0.zip' `
+            '4c8e68f6b663598d77b7c3f76459b16fad00994e53ea8af0bd106a805dd5c18b' "$work\nefcon.zip"
+          Expand-Archive "$work\vdd.zip" "$work\vdd" -Force
+          Expand-Archive "$work\nefcon.zip" "$work\nefcon" -Force
+          # Settings like the driver's own installer writes, so Sidecast can add the phone's resolution.
+          New-Item -ItemType Directory -Force 'C:\VirtualDisplayDriver' | Out-Null
+          Set-Content -Encoding UTF8 'C:\VirtualDisplayDriver\vdd_settings.xml' @'
+          <?xml version='1.0' encoding='utf-8'?>
+          <vdd_settings>
+              <monitors>
+                  <count>1</count>
+              </monitors>
+              <gpu>
+                  <friendlyname>default</friendlyname>
+              </gpu>
+              <global>
+                  <g_refresh_rate>60</g_refresh_rate>
+              </global>
+              <resolutions>
+                  <resolution>
+                      <width>1920</width>
+                      <height>1080</height>
+                      <refresh_rate>60</refresh_rate>
+                  </resolution>
+              </resolutions>
+          </vdd_settings>
+          '@
+          # Trust the driver's publisher first, as its installer does, so Windows installs it without a prompt.
+          $cat = Get-ChildItem -Recurse "$work\vdd" -Filter 'mttvdd.cat' | Select-Object -First 1
+          $certs = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection
+          $certs.Import([IO.File]::ReadAllBytes($cat.FullName))
+          foreach ($cert in $certs) {
+            $file = Join-Path $work "$($cert.Thumbprint).cer"
+            [IO.File]::WriteAllBytes($file, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+            Import-Certificate -FilePath $file -CertStoreLocation 'Cert:\LocalMachine\TrustedPublisher' | Out-Null
+          }
+          $inf = Get-ChildItem -Recurse "$work\vdd" -Filter 'MttVDD.inf' | Select-Object -First 1
+          $nefcon = Get-ChildItem -Recurse "$work\nefcon" -Filter 'nefconc.exe' | Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1
+          & $nefcon.FullName install $inf.FullName 'Root\MttVDD'
+          for ($i = 0; $i -lt 60; $i++) {
+            if ([IO.Directory]::GetFiles('\\.\pipe\') -like '*MTTVirtualDisplayPipe') { break }
+            Start-Sleep -Seconds 1
+          }
+          Get-PnpDevice -Class Display | Format-Table -AutoSize Status, FriendlyName, InstanceId
+          if (-not ([IO.Directory]::GetFiles('\\.\pipe\') -like '*MTTVirtualDisplayPipe')) { throw 'the driver did not start (no control pipe)' }
+      - name: Host on a Virtual Display Driver monitor ↔ probe
+        if: steps.vdd.outcome == 'success'
+        shell: bash
+        run: ./scripts/windows-e2e.sh --expect-virtual-display
+      - name: Virtual Display Driver unavailable on this runner
+        if: steps.vdd.outcome != 'success'
+        shell: bash
+        run: echo "::warning::The Virtual Display Driver could not be installed on this runner, so the virtual-monitor path was not exercised"
 
   conformance:
     name: Swift ↔ Rust conformance
