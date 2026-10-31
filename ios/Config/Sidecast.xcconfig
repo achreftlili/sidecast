@@ -1,0 +1,9 @@
+// Build settings shared by every configuration. Installing on a device needs
+// your own Apple team and a bundle identifier nobody else uses: copy
+// ../Local.xcconfig.example to ../Local.xcconfig (gitignored) and fill it in.
+// Simulator builds work without it.
+
+SIDECAST_BUNDLE_ID = com.example.sidecast
+DEVELOPMENT_TEAM =
+
+#include? "../Local.xcconfig"

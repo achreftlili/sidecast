@@ -1,0 +1,679 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0FCEC9B9BA0399163B7BB936 /* KeychainPairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F444462E4012C2B9ACC06396 /* KeychainPairingStore.swift */; };
+		394F217D44CF628067A06AB3 /* DisplayViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1FD554365E7004D4FB3FF7 /* DisplayViewController.swift */; };
+		3EEA8BC830208AD2D1537DA4 /* AudioEngineRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61FB7E183062294057CFF69 /* AudioEngineRecorder.swift */; };
+		54AC329B2210F77B263E8FE5 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A821AEF593E2346315DE20 /* AppSettings.swift */; };
+		6D58D8E6CA0854A209F41D7B /* VideoDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A5B49E014242009A14A290 /* VideoDecoder.swift */; };
+		6E123D801B09B51E21938DD8 /* ComputerListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 638E3B81F167540A255A655A /* ComputerListViewController.swift */; };
+		746883FCB4C810936240C56A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6CAF6346DCC105DC43105E9 /* AppDelegate.swift */; };
+		7DA814E6BC56A1CADF2710BA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1E92521E21D43876C367D7C7 /* Assets.xcassets */; };
+		83EC15ED28C5601409159E55 /* SidecastKit in Frameworks */ = {isa = PBXBuildFile; productRef = B421E29315167E3A69C6A8B6 /* SidecastKit */; };
+		8B0CA98AD93A74B06C2CC097 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918161F7B103758DABA00C9E /* Keychain.swift */; };
+		8CB7549D5A8EA5487120A5D8 /* SidecastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA1EF047F9219698490E11F /* SidecastTests.swift */; };
+		A0876AA0869E41D099C20945 /* DisplayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE3E9E1D34B2F9F5242D975 /* DisplayController.swift */; };
+		A70AF0C3FB6A0F39F4C822F4 /* DisplayViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0512DB6633CBFFC73ADC0511 /* DisplayViews.swift */; };
+		BA821B0DA55A64F9794F7E2C /* EndToEndUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE354B7DD635CF1A1AF45FE7 /* EndToEndUITests.swift */; };
+		D5A101F4EBA74E8727A06150 /* ComputerDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1764A5A213AF9FB037F3D0A2 /* ComputerDiscovery.swift */; };
+		D8ADD57ADBD33BDA0EE108FC /* OverlayPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57B51409B967A317ABDDDC18 /* OverlayPresenter.swift */; };
+		F5A8F53BD0E094810EFE7519 /* PairingPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DE3DD32AC892129A1A66929 /* PairingPrompt.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AB522531A9F67DC0E6FBD0B7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3D8B57CC3E04732AB143DD56 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DC46F6E40773F6DE436037EE;
+			remoteInfo = SidecastApp;
+		};
+		EE048E109DD4D21141DDA8B9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3D8B57CC3E04732AB143DD56 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DC46F6E40773F6DE436037EE;
+			remoteInfo = SidecastApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0512DB6633CBFFC73ADC0511 /* DisplayViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayViews.swift; sourceTree = "<group>"; };
+		081891CBDC92236A7B920717 /* SidecastUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SidecastUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		10A5B49E014242009A14A290 /* VideoDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDecoder.swift; sourceTree = "<group>"; };
+		1764A5A213AF9FB037F3D0A2 /* ComputerDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerDiscovery.swift; sourceTree = "<group>"; };
+		1E92521E21D43876C367D7C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2BE1A5DFC51948570967B8F7 /* mac */ = {isa = PBXFileReference; lastKnownFileType = folder; name = mac; path = ../mac; sourceTree = SOURCE_ROOT; };
+		2DE3DD32AC892129A1A66929 /* PairingPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingPrompt.swift; sourceTree = "<group>"; };
+		4C29B883DD2E184772CD51B0 /* Sidecast.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Sidecast.xcconfig; sourceTree = "<group>"; };
+		57B51409B967A317ABDDDC18 /* OverlayPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPresenter.swift; sourceTree = "<group>"; };
+		638E3B81F167540A255A655A /* ComputerListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerListViewController.swift; sourceTree = "<group>"; };
+		6B1FD554365E7004D4FB3FF7 /* DisplayViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayViewController.swift; sourceTree = "<group>"; };
+		72252FC098DF3139C1E65244 /* SidecastTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SidecastTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		85ACBF4994BB8A382F5FC2E9 /* SidecastApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SidecastApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		918161F7B103758DABA00C9E /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
+		A61FB7E183062294057CFF69 /* AudioEngineRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngineRecorder.swift; sourceTree = "<group>"; };
+		BCA1EF047F9219698490E11F /* SidecastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecastTests.swift; sourceTree = "<group>"; };
+		C0A821AEF593E2346315DE20 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		E6CAF6346DCC105DC43105E9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F444462E4012C2B9ACC06396 /* KeychainPairingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainPairingStore.swift; sourceTree = "<group>"; };
+		FCE3E9E1D34B2F9F5242D975 /* DisplayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayController.swift; sourceTree = "<group>"; };
+		FE354B7DD635CF1A1AF45FE7 /* EndToEndUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndToEndUITests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0A570860EB2A9C4148104DFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				83EC15ED28C5601409159E55 /* SidecastKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0AC1D67798B930BB52CB931D /* SidecastTests */ = {
+			isa = PBXGroup;
+			children = (
+				BCA1EF047F9219698490E11F /* SidecastTests.swift */,
+			);
+			path = SidecastTests;
+			sourceTree = "<group>";
+		};
+		1544C821E9B475F7C9CFAF04 /* List */ = {
+			isa = PBXGroup;
+			children = (
+				638E3B81F167540A255A655A /* ComputerListViewController.swift */,
+			);
+			path = List;
+			sourceTree = "<group>";
+		};
+		330CB7194EEAA0DBF8DF1B99 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				2BE1A5DFC51948570967B8F7 /* mac */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		5C0D166BDA4CFB8926D4E5FA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				85ACBF4994BB8A382F5FC2E9 /* SidecastApp.app */,
+				72252FC098DF3139C1E65244 /* SidecastTests.xctest */,
+				081891CBDC92236A7B920717 /* SidecastUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6E37DA6ABE3778BFE8F75D2F /* Sidecast */ = {
+			isa = PBXGroup;
+			children = (
+				D28154DC39C55729354DA7D5 /* App */,
+				6E5B2F6008D5BB8204030DA6 /* Audio */,
+				83A0560419519EC34E0729AC /* Display */,
+				1544C821E9B475F7C9CFAF04 /* List */,
+				906ADA93BAEFC38523FAEFFE /* Net */,
+				98313234C44201A2BD63C0EC /* Store */,
+				EE373E695675450A1A741490 /* Video */,
+				1E92521E21D43876C367D7C7 /* Assets.xcassets */,
+			);
+			path = Sidecast;
+			sourceTree = "<group>";
+		};
+		6E5B2F6008D5BB8204030DA6 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				A61FB7E183062294057CFF69 /* AudioEngineRecorder.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		83A0560419519EC34E0729AC /* Display */ = {
+			isa = PBXGroup;
+			children = (
+				FCE3E9E1D34B2F9F5242D975 /* DisplayController.swift */,
+				6B1FD554365E7004D4FB3FF7 /* DisplayViewController.swift */,
+				0512DB6633CBFFC73ADC0511 /* DisplayViews.swift */,
+				57B51409B967A317ABDDDC18 /* OverlayPresenter.swift */,
+				2DE3DD32AC892129A1A66929 /* PairingPrompt.swift */,
+			);
+			path = Display;
+			sourceTree = "<group>";
+		};
+		906ADA93BAEFC38523FAEFFE /* Net */ = {
+			isa = PBXGroup;
+			children = (
+				1764A5A213AF9FB037F3D0A2 /* ComputerDiscovery.swift */,
+			);
+			path = Net;
+			sourceTree = "<group>";
+		};
+		98313234C44201A2BD63C0EC /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				918161F7B103758DABA00C9E /* Keychain.swift */,
+				F444462E4012C2B9ACC06396 /* KeychainPairingStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		A73DEEF7F338600389032759 = {
+			isa = PBXGroup;
+			children = (
+				FB18847F70E4E3D9D3D7C52B /* Config */,
+				330CB7194EEAA0DBF8DF1B99 /* Packages */,
+				6E37DA6ABE3778BFE8F75D2F /* Sidecast */,
+				0AC1D67798B930BB52CB931D /* SidecastTests */,
+				F96490C1D5F6E8F6CDE56CBE /* SidecastUITests */,
+				5C0D166BDA4CFB8926D4E5FA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D28154DC39C55729354DA7D5 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				E6CAF6346DCC105DC43105E9 /* AppDelegate.swift */,
+				C0A821AEF593E2346315DE20 /* AppSettings.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		EE373E695675450A1A741490 /* Video */ = {
+			isa = PBXGroup;
+			children = (
+				10A5B49E014242009A14A290 /* VideoDecoder.swift */,
+			);
+			path = Video;
+			sourceTree = "<group>";
+		};
+		F96490C1D5F6E8F6CDE56CBE /* SidecastUITests */ = {
+			isa = PBXGroup;
+			children = (
+				FE354B7DD635CF1A1AF45FE7 /* EndToEndUITests.swift */,
+			);
+			path = SidecastUITests;
+			sourceTree = "<group>";
+		};
+		FB18847F70E4E3D9D3D7C52B /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				4C29B883DD2E184772CD51B0 /* Sidecast.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2AFB3684E50FBE885D54AB68 /* SidecastTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D91E342E4DB41247F78F7E3C /* Build configuration list for PBXNativeTarget "SidecastTests" */;
+			buildPhases = (
+				19024E9A43700CE676E61C9E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B4ABCF90F382C1423FF2FEBD /* PBXTargetDependency */,
+			);
+			name = SidecastTests;
+			packageProductDependencies = (
+			);
+			productName = SidecastTests;
+			productReference = 72252FC098DF3139C1E65244 /* SidecastTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A674381EB323797CA76D74EA /* SidecastUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7CF69A923374E7935D4BF864 /* Build configuration list for PBXNativeTarget "SidecastUITests" */;
+			buildPhases = (
+				F9E33457D52698BE6F0FA97D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				22624278F92FD99B2A682E55 /* PBXTargetDependency */,
+			);
+			name = SidecastUITests;
+			packageProductDependencies = (
+			);
+			productName = SidecastUITests;
+			productReference = 081891CBDC92236A7B920717 /* SidecastUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		DC46F6E40773F6DE436037EE /* SidecastApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7D6C0F1F76329908AA74425 /* Build configuration list for PBXNativeTarget "SidecastApp" */;
+			buildPhases = (
+				A620465655038F1B8E81BE24 /* Sources */,
+				E00F0367DB477CC94F7DDDE1 /* Resources */,
+				0A570860EB2A9C4148104DFB /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SidecastApp;
+			packageProductDependencies = (
+				B421E29315167E3A69C6A8B6 /* SidecastKit */,
+			);
+			productName = SidecastApp;
+			productReference = 85ACBF4994BB8A382F5FC2E9 /* SidecastApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3D8B57CC3E04732AB143DD56 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2AFB3684E50FBE885D54AB68 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					A674381EB323797CA76D74EA = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = DC46F6E40773F6DE436037EE;
+					};
+					DC46F6E40773F6DE436037EE = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = AA5757C8353E0E4C104B2C10 /* Build configuration list for PBXProject "Sidecast" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A73DEEF7F338600389032759;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4A94F876820AE81B12351620 /* XCLocalSwiftPackageReference "../mac" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5C0D166BDA4CFB8926D4E5FA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DC46F6E40773F6DE436037EE /* SidecastApp */,
+				2AFB3684E50FBE885D54AB68 /* SidecastTests */,
+				A674381EB323797CA76D74EA /* SidecastUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E00F0367DB477CC94F7DDDE1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7DA814E6BC56A1CADF2710BA /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		19024E9A43700CE676E61C9E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8CB7549D5A8EA5487120A5D8 /* SidecastTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A620465655038F1B8E81BE24 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				746883FCB4C810936240C56A /* AppDelegate.swift in Sources */,
+				54AC329B2210F77B263E8FE5 /* AppSettings.swift in Sources */,
+				3EEA8BC830208AD2D1537DA4 /* AudioEngineRecorder.swift in Sources */,
+				D5A101F4EBA74E8727A06150 /* ComputerDiscovery.swift in Sources */,
+				6E123D801B09B51E21938DD8 /* ComputerListViewController.swift in Sources */,
+				A0876AA0869E41D099C20945 /* DisplayController.swift in Sources */,
+				394F217D44CF628067A06AB3 /* DisplayViewController.swift in Sources */,
+				A70AF0C3FB6A0F39F4C822F4 /* DisplayViews.swift in Sources */,
+				8B0CA98AD93A74B06C2CC097 /* Keychain.swift in Sources */,
+				0FCEC9B9BA0399163B7BB936 /* KeychainPairingStore.swift in Sources */,
+				D8ADD57ADBD33BDA0EE108FC /* OverlayPresenter.swift in Sources */,
+				F5A8F53BD0E094810EFE7519 /* PairingPrompt.swift in Sources */,
+				6D58D8E6CA0854A209F41D7B /* VideoDecoder.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F9E33457D52698BE6F0FA97D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BA821B0DA55A64F9794F7E2C /* EndToEndUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		22624278F92FD99B2A682E55 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DC46F6E40773F6DE436037EE /* SidecastApp */;
+			targetProxy = EE048E109DD4D21141DDA8B9 /* PBXContainerItemProxy */;
+		};
+		B4ABCF90F382C1423FF2FEBD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DC46F6E40773F6DE436037EE /* SidecastApp */;
+			targetProxy = AB522531A9F67DC0E6FBD0B7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		110CC6A8C96A0BC9D77BEF9C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SIDECAST_BUNDLE_ID).uitests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SidecastApp;
+			};
+			name = Debug;
+		};
+		1633274D3074F895F3E9BE5A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Sidecast/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SIDECAST_BUNDLE_ID)";
+				PRODUCT_NAME = Sidecast;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		1BABE4344D7E30542D39B24E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4C29B883DD2E184772CD51B0 /* Sidecast.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.6.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1CDD19258C26EDE01123EB59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SIDECAST_BUNDLE_ID).tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sidecast.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sidecast";
+			};
+			name = Release;
+		};
+		451ACFD3E96832313803082C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Sidecast/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SIDECAST_BUNDLE_ID)";
+				PRODUCT_NAME = Sidecast;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5C6E218FA82650E4EEA0CA32 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4C29B883DD2E184772CD51B0 /* Sidecast.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.6.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A267B8980F1F1A4DE735B75E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SIDECAST_BUNDLE_ID).uitests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SidecastApp;
+			};
+			name = Release;
+		};
+		C79E0815BB1B533C3A234AEC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SIDECAST_BUNDLE_ID).tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sidecast.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sidecast";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7CF69A923374E7935D4BF864 /* Build configuration list for PBXNativeTarget "SidecastUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				110CC6A8C96A0BC9D77BEF9C /* Debug */,
+				A267B8980F1F1A4DE735B75E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AA5757C8353E0E4C104B2C10 /* Build configuration list for PBXProject "Sidecast" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1BABE4344D7E30542D39B24E /* Debug */,
+				5C6E218FA82650E4EEA0CA32 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D7D6C0F1F76329908AA74425 /* Build configuration list for PBXNativeTarget "SidecastApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				451ACFD3E96832313803082C /* Debug */,
+				1633274D3074F895F3E9BE5A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D91E342E4DB41247F78F7E3C /* Build configuration list for PBXNativeTarget "SidecastTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C79E0815BB1B533C3A234AEC /* Debug */,
+				1CDD19258C26EDE01123EB59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4A94F876820AE81B12351620 /* XCLocalSwiftPackageReference "../mac" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../mac;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B421E29315167E3A69C6A8B6 /* SidecastKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SidecastKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 3D8B57CC3E04732AB143DD56 /* Project object */;
+}
