@@ -131,6 +131,7 @@ Good to know:
 - GNOME shows its "screen is being shared" indicator while a phone is connected. The virtual monitor appears to the right of your screens at 200 % (100 % if you turned HiDPI off on the phone); you can move it or change its scale in **Settings → Displays** while it is connected.
 - **3/4-finger swipes**: left/right switch workspaces (Super+Page Down/Up), up opens the Activities overview, down switches to the app's next window (Alt+\`, GNOME has no App Exposé).
 - **Typing**: ASCII is typed directly; other characters (é, emoji) use GNOME's Ctrl+Shift+U Unicode entry, which works in GTK, Qt, Firefox and Chromium apps. If your keyboard layout has keys for them, `SIDECAST_TEXT_INPUT=keysyms sidecast-host` types them directly instead.
+- **Mirror a screen instead** of adding one: `sidecast-host --monitor DP-1` (or `primary`; `sidecast-host --diagnose` lists the monitors). A screen of another shape than the phone shows between black bars.
 - **Microphone**: choose "Sidecast Microphone" in Settings → Sound or in the app; the phone records only while an app listens.
 - **Keeps the computer awake** while a phone is connected (systemd-logind); the screen lock and closing the lid behave as usual.
 - **Other desktops**: on KDE Plasma 6 and wlroots compositors (Sway, Hyprland…) the host uses the desktop portal instead, which asks before sharing (a virtual monitor where the portal offers one, otherwise it mirrors a screen); this path is untested. **X11 sessions are not supported** yet.

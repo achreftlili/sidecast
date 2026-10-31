@@ -1,5 +1,6 @@
 //! GNOME on Wayland: a virtual monitor from Mutter's ScreenCast
-//! `RecordVirtual`, captured over PipeWire, and input through a RemoteDesktop
+//! `RecordVirtual` (or, with `--monitor`, an existing monitor through
+//! `RecordMonitor`), captured over PipeWire, and input through a RemoteDesktop
 //! session linked to it (the API gnome-remote-desktop uses). No consent
 //! dialog: these D-Bus APIs are open to the user's own session, and GNOME
 //! shows its "screen is being shared" indicator while they run.
@@ -25,6 +26,7 @@ use super::display_config;
 use super::keymap::TextInput;
 use super::remote_input::{RemoteApi, RemoteInputSink};
 use super::translate::{RemoteCall, Translator};
+use crate::platform::MonitorChoice;
 
 #[zbus::proxy(
     interface = "org.gnome.Mutter.RemoteDesktop",
@@ -63,6 +65,7 @@ trait ScreenCast {
 #[zbus::proxy(interface = "org.gnome.Mutter.ScreenCast.Session", default_service = "org.gnome.Mutter.ScreenCast")]
 trait ScreenCastSession {
     fn record_virtual(&self, properties: HashMap<&str, Value<'_>>) -> zbus::Result<OwnedObjectPath>;
+    fn record_monitor(&self, connector: &str, properties: HashMap<&str, Value<'_>>) -> zbus::Result<OwnedObjectPath>;
 }
 
 #[zbus::proxy(interface = "org.gnome.Mutter.ScreenCast.Stream", default_service = "org.gnome.Mutter.ScreenCast")]
@@ -90,7 +93,16 @@ fn failed(what: &str) -> impl Fn(zbus::Error) -> String + '_ {
     move |e| format!("{what}: {e}")
 }
 
-/// A started RemoteDesktop session with one virtual-monitor stream.
+/// What a session records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Source {
+    /// A new monitor at the size negotiated on the PipeWire stream.
+    Virtual,
+    /// An existing monitor (mirroring), by connector.
+    Monitor(String),
+}
+
+/// A started RemoteDesktop session with one screencast stream.
 struct MutterSession {
     remote: RemoteDesktopSessionProxy<'static>,
     stream_path: String,
@@ -98,7 +110,7 @@ struct MutterSession {
 }
 
 impl MutterSession {
-    async fn start(connection: &zbus::Connection) -> Result<MutterSession, String> {
+    async fn start(connection: &zbus::Connection, source: &Source) -> Result<MutterSession, String> {
         let path = RemoteDesktopProxy::new(connection)
             .await
             .map_err(failed("Mutter's RemoteDesktop API"))?
@@ -111,7 +123,7 @@ impl MutterSession {
             .build()
             .await
             .map_err(failed("RemoteDesktop session"))?;
-        match Self::record(connection, remote.clone()).await {
+        match Self::record(connection, remote.clone(), source).await {
             Ok(session) => Ok(session),
             Err(error) => {
                 let _ = remote.stop().await;
@@ -123,6 +135,7 @@ impl MutterSession {
     async fn record(
         connection: &zbus::Connection,
         remote: RemoteDesktopSessionProxy<'static>,
+        source: &Source,
     ) -> Result<MutterSession, String> {
         let session_id = remote.session_id().await.map_err(failed("RemoteDesktop SessionId"))?;
         let screencast = ScreenCastProxy::new(connection).await.map_err(failed("Mutter's ScreenCast API"))?;
@@ -137,10 +150,16 @@ impl MutterSession {
             .build()
             .await
             .map_err(failed("ScreenCast session"))?;
-        let stream_path =
-            session.record_virtual(HashMap::from([("cursor-mode", Value::U32(CURSOR_MODE_METADATA))])).await.map_err(
-                |e| format!("ScreenCast.RecordVirtual (needs GNOME 42 or later; ScreenCast API v{version}): {e}"),
-            )?;
+        let properties = HashMap::from([("cursor-mode", Value::U32(CURSOR_MODE_METADATA))]);
+        let stream_path = match source {
+            Source::Virtual => session.record_virtual(properties).await.map_err(|e| {
+                format!("ScreenCast.RecordVirtual (needs GNOME 42 or later; ScreenCast API v{version}): {e}")
+            })?,
+            Source::Monitor(connector) => session
+                .record_monitor(connector, properties)
+                .await
+                .map_err(|e| format!("ScreenCast.RecordMonitor {connector}: {e}"))?,
+        };
         let stream = ScreenCastStreamProxy::builder(connection)
             .path(stream_path.clone())
             .map_err(failed("stream path"))?
@@ -177,11 +196,13 @@ pub struct MutterBackend {
     connection: zbus::Connection,
     active: Arc<Mutex<Option<Active>>>,
     text_input: TextInput,
+    /// `--monitor` / the saved choice: mirror this monitor instead of adding one.
+    monitor: MonitorChoice,
 }
 
 impl MutterBackend {
-    pub fn new(connection: zbus::Connection, text_input: TextInput) -> Self {
-        MutterBackend { connection, active: Arc::default(), text_input }
+    pub fn new(connection: zbus::Connection, text_input: TextInput, monitor: MonitorChoice) -> Self {
+        MutterBackend { connection, active: Arc::default(), text_input, monitor }
     }
 
     /// Whether Mutter's ScreenCast and RemoteDesktop APIs are on the session bus.
@@ -199,36 +220,17 @@ impl MutterBackend {
     }
 }
 
-impl DisplayBackend for MutterBackend {
-    fn name(&self) -> &str {
-        "gnome-mutter"
-    }
-
-    fn start(
+impl MutterBackend {
+    /// Logs the new virtual monitor and gives it the plan's scale; returns its position.
+    fn place_virtual_monitor(
         &self,
         plan: &StreamPlan,
         client: &ClientInfo,
-        frames: FrameSink,
-    ) -> Result<Box<dyn CaptureSession>, BackendError> {
-        let size = (plan.display.pixel_width() as u32, plan.display.pixel_height() as u32);
-        let monitors_before = zbus::block_on(display_config::connectors(&self.connection));
-        let session = zbus::block_on(MutterSession::start(&self.connection)).map_err(BackendError::display_failed)?;
-        let cursor = Arc::new(SharedCursor::default());
-        let config = CaptureConfig {
-            node_id: session.node_id,
-            remote_fd: None,
-            size,
-            fixed_size: true,
-            max_fps: plan.display.refresh_rate.max(plan.fps).clamp(1, 240) as u32,
-            encode: (plan.encode_width as usize, plan.encode_height as usize),
-        };
-        let capture = match PipeWireCapture::start(config, frames, cursor.clone()) {
-            Ok(capture) => capture,
-            Err(error) => {
-                session.stop();
-                return Err(BackendError::display_failed(error));
-            }
-        };
+        session: &MutterSession,
+        capture: &PipeWireCapture,
+        size: (u32, u32),
+        monitors_before: &[String],
+    ) -> Option<(i32, i32)> {
         if capture.size != size {
             log::warn!("mutter: asked for a {}x{} monitor, got {}x{}", size.0, size.1, capture.size.0, capture.size.1);
         }
@@ -237,7 +239,7 @@ impl DisplayBackend for MutterBackend {
         let scale = if plan.display.hi_dpi { 2.0 } else { 1.0 };
         let position = match zbus::block_on(display_config::scale_new_monitor(
             &self.connection,
-            &monitors_before,
+            monitors_before,
             capture.size,
             scale,
         )) {
@@ -259,6 +261,65 @@ impl DisplayBackend for MutterBackend {
             session.stream_path,
             session.node_id
         );
+        position
+    }
+}
+
+impl DisplayBackend for MutterBackend {
+    fn name(&self) -> &str {
+        "gnome-mutter"
+    }
+
+    fn start(
+        &self,
+        plan: &StreamPlan,
+        client: &ClientInfo,
+        frames: FrameSink,
+    ) -> Result<Box<dyn CaptureSession>, BackendError> {
+        let size = (plan.display.pixel_width() as u32, plan.display.pixel_height() as u32);
+        let mirrored = match self.monitor.get().filter(|m| !m.is_empty() && m != "virtual") {
+            Some(name) => Some(
+                zbus::block_on(display_config::find_monitor(&self.connection, &name))
+                    .map_err(BackendError::display_failed)?,
+            ),
+            None => None,
+        };
+        let source = mirrored.as_ref().map_or(Source::Virtual, |m| Source::Monitor(m.connector.clone()));
+        let monitors_before = zbus::block_on(display_config::connectors(&self.connection));
+        let session =
+            zbus::block_on(MutterSession::start(&self.connection, &source)).map_err(BackendError::display_failed)?;
+        let cursor = Arc::new(SharedCursor::default());
+        let config = CaptureConfig {
+            node_id: session.node_id,
+            remote_fd: None,
+            // A mirrored monitor keeps its own size (the picture is letterboxed).
+            size: mirrored.as_ref().map_or(size, |m| m.size),
+            fixed_size: mirrored.is_none(),
+            max_fps: plan.display.refresh_rate.max(plan.fps).clamp(1, 240) as u32,
+            encode: (plan.encode_width as usize, plan.encode_height as usize),
+        };
+        let capture = match PipeWireCapture::start(config, frames, cursor.clone()) {
+            Ok(capture) => capture,
+            Err(error) => {
+                session.stop();
+                return Err(BackendError::display_failed(error));
+            }
+        };
+        let position = match &mirrored {
+            Some(monitor) => {
+                log::info!(
+                    "mutter: mirroring monitor {} ({}x{} px) for {} (stream {}, PipeWire node {})",
+                    monitor.connector,
+                    capture.size.0,
+                    capture.size.1,
+                    client.device_name,
+                    session.stream_path,
+                    session.node_id
+                );
+                Some(monitor.position)
+            }
+            None => self.place_virtual_monitor(plan, client, &session, &capture, size, &monitors_before),
+        };
         let (x, y) = position.unwrap_or_default();
         let geometry = DisplayGeometry {
             size: Size::new(plan.display.width as f64, plan.display.height as f64),
@@ -319,9 +380,9 @@ impl Drop for MutterCapture {
             }
         }
         drop(self.capture.take());
-        // Stopping the session removes the virtual monitor.
+        // Stopping the session removes the virtual monitor (a mirrored one stays).
         self.session.stop();
-        log::info!("mutter: virtual monitor removed");
+        log::info!("mutter: screencast stopped");
     }
 }
 

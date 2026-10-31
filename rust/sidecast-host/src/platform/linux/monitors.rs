@@ -48,6 +48,35 @@ pub fn find_new_monitor<'a>(
     })
 }
 
+/// An existing monitor to mirror (`--monitor`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChosenMonitor {
+    pub connector: String,
+    /// Its current mode, in pixels.
+    pub size: (u32, u32),
+    /// Its place in the desktop.
+    pub position: (i32, i32),
+}
+
+/// The monitor `name` designates: a connector (`DP-1`, case-insensitive) or `primary`.
+pub fn find_monitor(logical: &[LogicalMonitor], monitors: &[MonitorInfo], name: &str) -> Result<ChosenMonitor, String> {
+    let name = name.trim();
+    let connector = if name.eq_ignore_ascii_case("primary") {
+        logical.iter().find(|l| l.primary).and_then(|l| l.connectors.first()).ok_or("no primary monitor")?.clone()
+    } else {
+        monitors.iter().find(|m| m.connector.eq_ignore_ascii_case(name)).map(|m| m.connector.clone()).ok_or_else(
+            || {
+                let known: Vec<&str> = monitors.iter().map(|m| m.connector.as_str()).collect();
+                format!("no monitor {name} (connected: {}, or `primary`)", known.join(", "))
+            },
+        )?
+    };
+    let monitor = monitors.iter().find(|m| m.connector == connector).ok_or("the monitor is not in the layout")?;
+    let (_, w, h) = monitor.current_mode.as_ref().ok_or_else(|| format!("{connector} is off"))?;
+    let position = logical.iter().find(|l| l.connectors.contains(&connector)).map_or((0, 0), |l| (l.x, l.y));
+    Ok(ChosenMonitor { connector, size: (*w as u32, *h as u32), position })
+}
+
 fn logical_width(monitors: &[MonitorInfo], logical: &LogicalMonitor, scale: f64) -> i32 {
     let pixels = logical
         .connectors
@@ -196,6 +225,22 @@ mod tests {
         assert_eq!(LayoutMode::from_dbus(Some(1)), Some(LayoutMode::Physical));
         assert_eq!(LayoutMode::from_dbus(Some(2)), Some(LayoutMode::Logical));
         assert_eq!(LayoutMode::from_dbus(None), None);
+    }
+
+    #[test]
+    fn finds_the_monitor_to_mirror_by_connector_or_primary() {
+        let monitors = [monitor("eDP-1", 2560, 1600, &[1.0, 2.0]), monitor("DP-1", 1920, 1080, &[1.0])];
+        let layout = [logical(0, 2.0, false, "DP-1"), logical(1920, 2.0, true, "eDP-1")];
+        let chosen = |name| find_monitor(&layout, &monitors, name);
+        assert_eq!(
+            chosen("dp-1").unwrap(),
+            ChosenMonitor { connector: "DP-1".into(), size: (1920, 1080), position: (0, 0) }
+        );
+        assert_eq!(
+            chosen("primary").unwrap(),
+            ChosenMonitor { connector: "eDP-1".into(), size: (2560, 1600), position: (1920, 0) }
+        );
+        assert_eq!(chosen("HDMI-2").unwrap_err(), "no monitor HDMI-2 (connected: eDP-1, DP-1, or `primary`)");
     }
 
     #[test]
