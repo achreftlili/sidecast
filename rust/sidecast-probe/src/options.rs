@@ -21,7 +21,12 @@ pub struct Options {
     pub seconds: f64,
     /// Pairing codes to try in order.
     pub codes: Vec<String>,
+    /// Read the pairing code from this file once the host shows one (hosts
+    /// with random codes, e.g. a real Linux host in an end-to-end test).
+    pub code_file: Option<PathBuf>,
     pub state_path: Option<PathBuf>,
+    /// Write the last decoded picture's luma here as a PGM image.
+    pub save_frame: Option<PathBuf>,
     pub codec: Option<VideoCodec>,
     pub width: i64,
     pub height: i64,
@@ -53,7 +58,9 @@ impl Default for Options {
             port: DEFAULT_PORT,
             seconds: 5.0,
             codes: Vec::new(),
+            code_file: None,
             state_path: None,
+            save_frame: None,
             codec: None,
             width: 2400,
             height: 1080,
@@ -77,17 +84,19 @@ impl Default for Options {
 
 pub const USAGE: &str = "\
 Usage: sidecast-probe --host H --port P [--seconds N] [--code 123456[,654321…]] [--state FILE]
-                      [--codec hevc|h264] [--width W --height H] [--refresh HZ]
+                      [--code-file FILE] [--codec hevc|h264] [--width W --height H] [--refresh HZ]
                       [--keyframe-request] [--no-input] [--type TEXT]… [--key N[:MODS]]…
                       [--gesture NAME]… [--input-mode touch|trackpad] [--mic]
                       [--network metered|unmetered] [--limits KBPS:FPS] [--stall-after S]
                       [--expect-auth-failure REASON] [--expect-platform macos|windows|linux]
-                      [--expect-codec hevc|h264] [--no-decode]
+                      [--expect-codec hevc|h264] [--no-decode] [--save-frame FILE.pgm]
 
 A scripted fake phone: pairs (--code) or authenticates (--state), negotiates a
 stream, acks and checks every frame (Annex-B structure; H.264 is also decoded
 when built with OpenH264), sends input, prints statistics, and exits 1 on any
-protocol violation.
+protocol violation. --code-file waits (up to 30 s) for the code a host shows to
+appear in FILE, for hosts with random codes; --save-frame writes the last
+decoded picture's luma as a PGM image.
 
 Gestures: tap2 swipe3-left swipe3-right swipe3-up swipe3-down swipe4-left tap3
 scroll2 trackpad-move trackpad-tap trackpad-doubletap-drag";
@@ -109,6 +118,8 @@ impl Options {
                 "--port" => o.port = number::<u16>(&arg, &mut it).and_then(nonzero)?,
                 "--seconds" => o.seconds = number::<f64>(&arg, &mut it).and_then(positive)?,
                 "--code" => o.codes = value(&arg, &mut it)?.split(',').map(str::to_owned).collect(),
+                "--code-file" => o.code_file = Some(PathBuf::from(value(&arg, &mut it)?)),
+                "--save-frame" => o.save_frame = Some(PathBuf::from(value(&arg, &mut it)?)),
                 "--state" => o.state_path = Some(PathBuf::from(value(&arg, &mut it)?)),
                 "--codec" => o.codec = Some(codec(value(&arg, &mut it)?)?),
                 "--width" => o.width = number(&arg, &mut it)?,
