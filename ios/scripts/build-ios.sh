@@ -52,4 +52,6 @@ if [[ -z "$SIMULATOR" ]]; then
     exit 1
 fi
 printf '==> Unit tests on simulator %s\n' "$SIMULATOR"
-xcodebuild "${PROJECT[@]}" -destination "id=$SIMULATOR" "${NO_SIGNING[@]}" -only-testing:SidecastTests -quiet test
+# Only the results; awk always succeeds, so pipefail still reports a failing xcodebuild.
+xcodebuild "${PROJECT[@]}" -destination "id=$SIMULATOR" "${NO_SIGNING[@]}" -only-testing:SidecastTests test 2>&1 \
+    | awk '/Test Case .*(passed|failed|skipped)|error:|Executed [0-9]+ test|\*\* TEST/ { print; fflush() }'
