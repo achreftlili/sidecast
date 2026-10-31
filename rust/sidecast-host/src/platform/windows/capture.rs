@@ -11,7 +11,9 @@
 //! re-creates it, retrying until the monitor is back.
 //!
 //! Flow control: one frame is delivered per frame interval at most, and only
-//! when the desktop or the pointer changed (or a refresh was asked for). A
+//! when the desktop or the pointer changed (or a refresh was asked for), and a
+//! still picture is repeated every [`IDLE_REPEAT`] so the server's 2 s
+//! keyframe rule keeps the phone's keyframes coming (like the Linux host). A
 //! changed desktop is first copied on the GPU (cheap); it is read back and
 //! converted only once [`FrameSink::try_reserve`] grants a slot, so dropped
 //! frames cost nothing and the latest picture still goes out when the
@@ -19,6 +21,9 @@
 
 // FFI module: every `unsafe` block says why it is sound.
 #![allow(unsafe_code)]
+
+/// How often a still picture is repeated: keyframe gaps stay ≤ 2 s + this.
+const IDLE_REPEAT: Duration = Duration::from_millis(250);
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -375,8 +380,10 @@ impl Capturer {
         let mut gpu_copy_pending = false;
         let mut first = true;
         let mut next_due = Instant::now();
+        let mut last_submit = Instant::now();
         while !self.stopped() {
-            if self.refresh.swap(false, Ordering::Relaxed) {
+            let idle = self.desktop_valid && last_submit.elapsed() >= IDLE_REPEAT;
+            if self.refresh.swap(false, Ordering::Relaxed) || idle {
                 pending = true;
             }
             let now = Instant::now();
@@ -408,6 +415,7 @@ impl Capturer {
                     }
                     if self.desktop_valid {
                         slot.submit(self.compose());
+                        last_submit = Instant::now();
                     }
                     pending = false;
                 }
