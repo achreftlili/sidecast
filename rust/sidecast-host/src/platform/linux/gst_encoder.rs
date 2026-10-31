@@ -312,6 +312,8 @@ mod tests {
     fn encodes_annexb_access_units_with_forced_keyframes() {
         let factory = match GstEncoderFactory::try_element("openh264enc") {
             Ok(factory) => factory,
+            // CI installs the plugin and sets this, so the test cannot silently skip there.
+            Err(error) if std::env::var_os("SIDECAST_REQUIRE_GST_OPENH264").is_some() => panic!("{error}"),
             Err(error) => {
                 eprintln!("skipped: {error}");
                 return;

@@ -87,7 +87,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cargo clippy -p sidecast-host --features gstreamer --all-targets -- -D warnings
-          cargo test -p sidecast-host --features gstreamer
+          SIDECAST_REQUIRE_GST_OPENH264=1 cargo test -p sidecast-host --features gstreamer
       - name: Tests
         run: cargo test
         env:
