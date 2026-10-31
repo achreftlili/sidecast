@@ -108,8 +108,9 @@ hevc_only_refused() {
 
 step "Building the Rust host and probe (release)"
 (cd "$REPO_DIR/rust" && cargo build --release -p sidecast-host -p sidecast-probe) || exit 1
-RUST_HOST="$REPO_DIR/rust/target/release/sidecast-host$EXE"
-RUST_PROBE="$REPO_DIR/rust/target/release/sidecast-probe$EXE"
+TARGET_DIR="${CARGO_TARGET_DIR:-$REPO_DIR/rust/target}"
+RUST_HOST="$TARGET_DIR/release/sidecast-host$EXE"
+RUST_PROBE="$TARGET_DIR/release/sidecast-probe$EXE"
 
 # ---------------------------------------------------------------- Rust probe ↔ Rust host
 step "Rust probe ↔ Rust host ($OS, port $RUST_PORT)"
