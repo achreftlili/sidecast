@@ -221,6 +221,31 @@ fn fail_early(why: &str) -> i32 {
     1
 }
 
+/// Waits up to 30 s for six digits in `path` (written by a test harness from
+/// the host's log or notification). Blocking is fine here: the host waits for
+/// the proof, and nothing else is due while pairing.
+fn read_code_file(path: &std::path::Path) -> Option<String> {
+    println!("probe: waiting for the pairing code in {}", path.display());
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while Instant::now() < deadline {
+        if let Ok(text) = std::fs::read_to_string(path) {
+            let code = text.trim();
+            if code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit()) {
+                return Some(code.to_owned());
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    None
+}
+
+/// The luma plane as a binary PGM image.
+fn write_pgm(path: &std::path::Path, width: usize, height: usize, luma: &[u8]) -> std::io::Result<()> {
+    let mut data = format!("P5\n{width} {height}\n255\n").into_bytes();
+    data.extend_from_slice(&luma[..width * height]);
+    std::fs::write(path, data)
+}
+
 struct Probe {
     options: Options,
     state: ProbeState,
@@ -433,7 +458,7 @@ impl Probe {
             println!("probe: pinned fingerprint matches; sending AUTH");
             let device_id = self.state.device_id.clone();
             self.send(ClientMessage::Auth(AuthRequest { device_id, token }));
-        } else if !self.options.codes.is_empty() {
+        } else if !self.options.codes.is_empty() || self.options.code_file.is_some() {
             println!("probe: not paired yet; sending PAIR_START");
             self.awaiting_challenge = true;
             self.send(ClientMessage::PairStart);
@@ -461,6 +486,14 @@ impl Probe {
     }
 
     fn send_proof(&mut self) {
+        if self.options.codes.is_empty()
+            && let Some(path) = self.options.code_file.clone()
+        {
+            match read_code_file(&path) {
+                Some(code) => self.options.codes.push(code),
+                None => return self.fail(format!("no pairing code appeared in {} within 30 s", path.display())),
+            }
+        }
         let code = self.options.codes[self.code_index].clone();
         let mut nonce = [0u8; NONCE_LENGTH];
         SystemRandom.fill(&mut nonce);
@@ -587,7 +620,7 @@ impl Probe {
         self.decoder = None;
         self.decoding = self.options.decode && codec == VideoCodec::H264;
         if self.decoding {
-            self.decoder = FrameDecoder::new();
+            self.decoder = FrameDecoder::new(self.options.save_frame.is_some());
             self.decoding = self.decoder.is_some();
         }
         self.config = Some((codec, config));
@@ -925,6 +958,15 @@ impl Probe {
         }
         for line in self.stats.summary() {
             println!("{line}");
+        }
+        if let Some(path) = self.options.save_frame.clone() {
+            match self.decoder.as_ref().and_then(FrameDecoder::last_luma) {
+                Some((w, h, luma)) => match write_pgm(&path, *w, *h, luma) {
+                    Ok(()) => println!("probe: last decoded picture ({w}x{h} luma) saved to {}", path.display()),
+                    Err(error) => self.failures.push(format!("cannot write {}: {error}", path.display())),
+                },
+                None => self.failures.push("--save-frame: no decoded picture".into()),
+            }
         }
         self.finish();
     }
