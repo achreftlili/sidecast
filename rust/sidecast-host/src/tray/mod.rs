@@ -25,6 +25,7 @@ use std::sync::mpsc::{self, Receiver};
 use sidecast_server::data::{DataDir, HostSettings};
 use sidecast_server::{ServerEvent, ServerHandle};
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIM_SETVERSION,
@@ -68,6 +69,11 @@ const CMD_FORGET_FIRST: usize = 300;
 /// Runs the tray app until Quit. `--quit` asks a running one to quit (the
 /// installer uses it before replacing the files).
 pub fn run(args: impl Iterator<Item = String>) -> ExitCode {
+    // The UI thread is a single-threaded apartment, as the shell expects
+    // (ShellExecuteW, notifications); capture, encoders and audio run on
+    // other threads in the multithreaded one.
+    // SAFETY: no pointers; first COM call on this thread.
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
     init_process();
     let args: Vec<String> = args.collect();
     if args.iter().any(|a| a == "--quit") {
@@ -160,9 +166,10 @@ fn start(options: Options, log_path: PathBuf) -> Result<(), String> {
 fn quit_running() -> ExitCode {
     let class = wide(WINDOW_CLASS);
     for _ in 0..50 {
-        // SAFETY: a NUL-terminated class name; posting to another process's window is allowed.
+        // SAFETY: a NUL-terminated class name that outlives the call.
         match unsafe { FindWindowW(pcwstr(&class), PCWSTR::null()) } {
             Ok(hwnd) if !hwnd.is_invalid() => {
+                // SAFETY: posting to another process's window is allowed; a stale handle only fails.
                 let _ = unsafe { PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0)) };
             }
             _ => return ExitCode::SUCCESS,
