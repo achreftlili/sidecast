@@ -101,10 +101,13 @@ impl TlsIdentity {
         &self.certificate_der
     }
 
-    /// TLS 1.3 preferred, 1.2 minimum, no client certificates.
+    /// TLS 1.3 preferred, 1.2 minimum, no client certificates, and no session
+    /// resumption: phones pin the certificate on every connection (PROTOCOL §2),
+    /// and a resumed handshake does not present it (Network.framework clients
+    /// then see no peer certificate at all). The Mac host never resumes either.
     pub fn server_config(&self) -> Result<Arc<rustls::ServerConfig>, TlsError> {
         let provider = Arc::new(rustls::crypto::ring::default_provider());
-        let config = rustls::ServerConfig::builder_with_provider(provider)
+        let mut config = rustls::ServerConfig::builder_with_provider(provider)
             .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
             .map_err(TlsError::Rustls)?
             .with_no_client_auth()
@@ -113,6 +116,8 @@ impl TlsIdentity {
                 PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(self.private_key_der.clone())),
             )
             .map_err(TlsError::Rustls)?;
+        config.session_storage = Arc::new(rustls::server::NoServerSessionStorage {});
+        config.send_tls13_tickets = 0;
         Ok(Arc::new(config))
     }
 }
@@ -146,7 +151,11 @@ mod tests {
         let again = TlsIdentity::load_or_create(&dir).unwrap();
         assert_eq!(first.fingerprint(), again.fingerprint());
         assert_eq!(first.fingerprint(), certificate_fingerprint(again.certificate_der()));
-        assert!(first.server_config().is_ok());
+        let config = first.server_config().unwrap();
+        // Every handshake is a full one that presents the certificate phones pin.
+        assert_eq!(config.send_tls13_tickets, 0);
+        assert!(!config.session_storage.can_cache());
+        assert!(!config.ticketer.enabled());
         // A damaged key is replaced by a new identity.
         fs::write(dir.private_key_path(), b"junk").unwrap();
         assert_ne!(TlsIdentity::load_or_create(&dir).unwrap().fingerprint(), first.fingerprint());

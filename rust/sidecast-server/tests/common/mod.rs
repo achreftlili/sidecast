@@ -303,6 +303,24 @@ impl ServerCertVerifier for AcceptAny {
     }
 }
 
+/// A client config that accepts the host's self-signed certificate (the
+/// tests check the fingerprint themselves). It resumes sessions when the host allows.
+pub fn client_config() -> Arc<rustls::ClientConfig> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider.clone())
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(AcceptAny(provider)))
+        .with_no_client_auth();
+    Arc::new(config)
+}
+
+pub async fn tls_handshake(config: Arc<rustls::ClientConfig>) -> TlsStream<TcpStream> {
+    let tcp = TcpStream::connect(("127.0.0.1", port())).await.expect("connects");
+    TlsConnector::from(config).connect(ServerName::try_from("127.0.0.1").unwrap(), tcp).await.expect("TLS handshake")
+}
+
 pub struct TestClient {
     reader: ReadHalf<TlsStream<TcpStream>>,
     writer: WriteHalf<TlsStream<TcpStream>>,
@@ -316,18 +334,7 @@ pub struct TestClient {
 
 impl TestClient {
     pub async fn connect(device_id: &str) -> TestClient {
-        let provider = Arc::new(rustls::crypto::ring::default_provider());
-        let config = rustls::ClientConfig::builder_with_provider(provider.clone())
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(AcceptAny(provider)))
-            .with_no_client_auth();
-        let tcp = TcpStream::connect(("127.0.0.1", port())).await.expect("connects");
-        let tls = TlsConnector::from(Arc::new(config))
-            .connect(ServerName::try_from("127.0.0.1").unwrap(), tcp)
-            .await
-            .expect("TLS handshake");
+        let tls = tls_handshake(client_config()).await;
         let fingerprint = certificate_fingerprint(&tls.get_ref().1.peer_certificates().unwrap()[0]);
         let (reader, writer) = tokio::io::split(tls);
         TestClient {
