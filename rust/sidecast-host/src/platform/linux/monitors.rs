@@ -93,8 +93,11 @@ fn logical_width(monitors: &[MonitorInfo], logical: &LogicalMonitor, scale: f64)
 pub enum LayoutMode {
     /// Positions in logical pixels: a monitor's width there shrinks with its scale.
     Logical,
-    /// Positions in physical pixels (Mutter without fractional scaling): integer
-    /// scales only, and a scale change moves nothing.
+    /// Positions in physical pixels (Mutter without its `scale-monitor-framebuffer`
+    /// feature). There Mutter 50 reads a scaled virtual stream's input positions
+    /// in other units than its frames (seen on a headless Mutter 50: a tap at
+    /// pixel (1320, 540) of a 200 % monitor put the pointer in its corner), so
+    /// the scale is left alone.
     Physical,
 }
 
@@ -109,8 +112,9 @@ impl LayoutMode {
     }
 }
 
-/// The current layout with `connector` at `scale`. In logical mode, monitors to
-/// its right move by the change in its width, so the layout stays connected.
+/// The current layout with `connector` at `scale` (logical layout mode only).
+/// Monitors to its right move by the change in its width, so the layout stays
+/// connected.
 pub fn with_scale(
     logical: &[LogicalMonitor],
     monitors: &[MonitorInfo],
@@ -118,17 +122,18 @@ pub fn with_scale(
     connector: &str,
     scale: f64,
 ) -> Result<Vec<LogicalConfig>, String> {
+    if mode == LayoutMode::Physical {
+        return Err("GNOME uses its physical layout mode (fractional scaling off), where a scaled virtual \
+                    monitor's input does not line up; staying at 100 %"
+            .into());
+    }
     let monitor = monitors.iter().find(|m| m.connector == connector).ok_or("the monitor is not in the layout")?;
     if !monitor.scales.iter().any(|s| (s - scale).abs() < 1e-6) {
         return Err(format!("Mutter does not offer {:.0} % for {connector} ({:?})", scale * 100.0, monitor.scales));
     }
     let target = logical.iter().find(|l| l.connectors.iter().any(|c| c == connector)).ok_or("no logical monitor")?;
-    let (old_scale, new_scale) = match mode {
-        LayoutMode::Logical => (target.scale, scale),
-        LayoutMode::Physical => (1.0, 1.0),
-    };
-    let old_width = logical_width(monitors, target, old_scale);
-    let delta = logical_width(monitors, target, new_scale) - old_width;
+    let old_width = logical_width(monitors, target, target.scale);
+    let delta = logical_width(monitors, target, scale) - old_width;
     let right_edge = target.x + old_width;
     let mut configs = Vec::new();
     for l in logical {
@@ -219,9 +224,8 @@ mod tests {
             [logical(0, 1.0, true, "DP-1"), logical(1920, 1.0, false, "Meta-1"), logical(4320, 1.0, false, "HDMI-1")];
         let configs = with_scale(&layout, &monitors, LayoutMode::Logical, "Meta-1", 2.0).unwrap();
         assert_eq!(configs.iter().map(|c| (c.x, c.scale)).collect::<Vec<_>>(), [(0, 1.0), (1920, 2.0), (3120, 1.0)]);
-        // Physical layout (Mutter without fractional scaling): positions are pixels, nothing moves.
-        let configs = with_scale(&layout, &monitors, LayoutMode::Physical, "Meta-1", 2.0).unwrap();
-        assert_eq!(configs.iter().map(|c| (c.x, c.scale)).collect::<Vec<_>>(), [(0, 1.0), (1920, 2.0), (4320, 1.0)]);
+        // Physical layout (fractional scaling off): left at 100 %, input would not line up.
+        assert!(with_scale(&layout, &monitors, LayoutMode::Physical, "Meta-1", 2.0).is_err());
         assert_eq!(LayoutMode::from_dbus(Some(1)), Some(LayoutMode::Physical));
         assert_eq!(LayoutMode::from_dbus(Some(2)), Some(LayoutMode::Logical));
         assert_eq!(LayoutMode::from_dbus(None), None);
