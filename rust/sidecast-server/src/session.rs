@@ -103,6 +103,11 @@ pub(crate) async fn run(tcp: TcpStream, peer: SocketAddr, hub: Arc<Hub>, accepto
     }
     session.finished();
     drop(session);
+    // A capture that finished starting while the session closed: tear it down properly.
+    stream_events.close();
+    while let Ok(event) = stream_events.try_recv() {
+        crate::stream::discard(event);
+    }
     // Let a final BYE leave (the writer gives up after 2 s on a stuck peer).
     let _ = tokio::time::timeout(Duration::from_secs(3), writer_task).await;
 }
@@ -464,7 +469,7 @@ impl Session {
     }
 
     fn handle_stream_event(&mut self, event: StreamEvent) {
-        let Some(stream) = &mut self.stream else { return };
+        let Some(stream) = &mut self.stream else { return crate::stream::discard(event) };
         match event {
             StreamEvent::Started { generation, result } => match stream.on_started(generation, result) {
                 Ok(StartOutcome::Configured { first: true }) => {
