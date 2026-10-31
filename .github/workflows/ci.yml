@@ -66,6 +66,12 @@ jobs:
       SIDECAST_TEST_PORT: '0'
     steps:
       - uses: actions/checkout@v7
+      - name: Linux host build dependencies (PipeWire, libclang for its bindings, GStreamer)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends pkg-config clang libclang-dev libpipewire-0.3-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-bad
       - name: Rust toolchain (stable, rustfmt, clippy)
         run: |
           rustup toolchain install stable --profile minimal --component rustfmt,clippy
@@ -77,6 +83,11 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Clippy without OpenH264
         run: cargo clippy -p sidecast-server -p sidecast-host -p sidecast-probe --no-default-features --all-targets -- -D warnings
+      - name: Clippy and tests with the GStreamer encoders (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cargo clippy -p sidecast-host --features gstreamer --all-targets -- -D warnings
+          cargo test -p sidecast-host --features gstreamer
       - name: Tests
         run: cargo test
         env:
@@ -173,6 +184,34 @@ jobs:
         if: steps.vdd.outcome != 'success'
         shell: bash
         run: echo "::warning::The Virtual Display Driver could not be installed on this runner, so the virtual-monitor path was not exercised"
+
+  linux-gnome:
+    name: Linux host on headless GNOME
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+      - name: Headless GNOME (Mutter, PipeWire, WirePlumber), a Wayland test client, build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends mutter pipewire pipewire-bin wireplumber \
+            dbus-daemon libglib2.0-bin python3-gi gir1.2-glib-2.0 adwaita-icon-theme \
+            pkg-config clang libclang-dev libpipewire-0.3-dev
+          sudo apt-get install -y -qq --no-install-recommends wev || echo "no wev: the keyboard check is skipped"
+          . /etc/os-release && echo "$PRETTY_NAME, $(mutter --version | head -1)"
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Real GNOME backend ↔ probe (virtual monitor, capture, input, mic, tray)
+        run: TMPDIR="$RUNNER_TEMP" ./scripts/linux-e2e.sh
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-gnome-e2e-logs
+          path: ${{ runner.temp }}/sidecast-linux-e2e.*
 
   conformance:
     name: Swift ↔ Rust conformance
