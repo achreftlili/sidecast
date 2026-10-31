@@ -15,7 +15,8 @@ You can work on the Mac side without a phone: see "Testing without a phone" in t
 
 ## How the code is organised
 
-- `mac/Sources/SidecastKit`: the Mac's pure, unit-tested logic (protocol codec, pairing, flow control, gesture engine, keyboard mapping, audio jitter buffer). No AppKit or capture code here.
+- `mac/Sources/SidecastKit`: pure, unit-tested logic (protocol codec, pairing, flow control, gesture engine, keyboard mapping, audio jitter buffer), and in `Client/` the iOS client's (connect planner, session state machine, touch, keyboard, microphone). It builds for macOS and iOS: no AppKit, UIKit or capture code here.
+- `ios/`: the iPhone / iPad app (UIKit). `Sidecast.xcodeproj` is generated from `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen): edit `project.yml`, run `xcodegen` in `ios/` and commit both. `make test-ios` runs its unit tests on a simulator; the end-to-end UI test needs a test-pattern host (see the top of `ios/SidecastUITests/EndToEndUITests.swift`).
 - `mac/Sources/Sidecast`: the menu-bar app (server, capture, encoding, virtual display, input injection, UI).
 - `mac/Sources/SidecastMicDriver`: the "Sidecast Microphone" Core Audio driver (C).
 - `android/app/src/main/java/.../`: `protocol/` and `net/` (codec, TLS, session), `video/`, `input/`, `audio/`, `store/`, `ui/`.
@@ -32,7 +33,7 @@ You can work on the Mac side without a phone: see "Testing without a phone" in t
 
 ## New platforms
 
-Windows and Linux computers and iOS phones are on the [roadmap](docs/ROADMAP.md). If you want to work on one, open an issue first so we can agree on the approach. A new client or host is done when it passes the same protocol test vectors and works with the existing apps.
+Windows and Linux computers are on the [roadmap](docs/ROADMAP.md); the iOS client is a preview that needs testing on real devices. If you want to work on one, open an issue first so we can agree on the approach. A new client or host is done when it passes the same protocol test vectors and works with the existing apps.
 
 ## Pull requests
 

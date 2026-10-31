@@ -1,6 +1,6 @@
 # Sidecast
 
-Turn your **Android phone** into an **extended display, touchpad, keyboard and microphone** for your **Mac**: over Wi-Fi at home, or from anywhere through Tailscale.
+Turn your **Android phone, iPhone or iPad** into an **extended display, touchpad, keyboard and microphone** for your **Mac**: over Wi-Fi at home, or from anywhere through Tailscale.
 
 Free and open source (Apache 2.0). No account, no cloud, no telemetry: the phone talks straight to your Mac, encrypted end to end. You build and install it yourself from this repository; nothing is sold or tracked.
 
@@ -13,7 +13,7 @@ Free and open source (Apache 2.0). No account, no cloud, no telemetry: the phone
 
 The Mac creates a virtual monitor, captures it with ScreenCaptureKit, encodes it with the hardware HEVC/H.264 encoder and streams it over TLS. The phone decodes it full screen and sends touches back as mouse and keyboard input. Design decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Wire protocol: [docs/PROTOCOL.md](docs/PROTOCOL.md). Where it's going (Windows, Linux, iOS): [docs/ROADMAP.md](docs/ROADMAP.md).
 
-**Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone.
+**Requirements**: a Mac with macOS 15 or later (Apple Silicon; Intel builds compile but are untested) and an Android 10+ phone, or an iPhone / iPad with iOS 17 or later (see [iPhone / iPad](#iphone--ipad)).
 
 ## How Sidecast compares
 
@@ -25,7 +25,7 @@ Using an Android device as a Mac display isn't new: Duet Display, Wing Display a
 - **Secure by default**: TLS on every connection, the Mac's certificate pinned at pairing, and a token per device.
 - **Built for phones**: most alternatives target tablets; Sidecast is designed around the phone you already carry.
 
-Where the alternatives are ahead today: they install from an app store instead of from source, many offer a USB connection for lower latency, and some also run on iPad or Windows. [docs/ROADMAP.md](docs/ROADMAP.md) lists what's planned.
+Where the alternatives are ahead today: they install from an app store instead of from source, many offer a USB connection for lower latency, and some also run on Windows. [docs/ROADMAP.md](docs/ROADMAP.md) lists what's planned.
 
 ## Install from source
 
@@ -72,12 +72,29 @@ make install-android
 
 It builds the app, installs it over adb and opens it. Installing over adb works on every Android phone, including those with Google's developer-verification rules.
 
+### iPhone / iPad
+
+You need **Xcode** (the full app, not only the Command Line Tools) and an **Apple ID**. A **free Apple ID works, but iOS stops opening the app after 7 days**: run `make install-ios` again to renew it (pairings and settings are kept). A paid Apple Developer account makes an install last a year.
+
+1. Xcode → **Settings → Accounts**: sign in with your Apple ID (a free one shows "Personal Team").
+2. Copy `ios/Local.xcconfig.example` to `ios/Local.xcconfig` and fill in your **team ID** and a **bundle identifier of your own** (e.g. `com.yourname.sidecast`; Apple refuses one that another team already uses).
+3. Connect the iPhone or iPad with a cable, unlock it and tap **Trust**. Turn on **Settings → Privacy & Security → Developer Mode** (the device restarts).
+4. Run:
+
+```bash
+make install-ios
+```
+
+It builds the app, installs it and opens it. The first time, iOS asks you to trust the developer: **Settings → General → VPN & Device Management → your Apple ID → Trust**, then open Sidecast. Allow **Local Network** when asked, so it can find your computers.
+
+An iPad makes a great second screen: the Apple Pencil works like a finger, and a hardware keyboard types on the computer too. The display screen is landscape and keeps the device awake. iOS doesn't let apps run in the background, so the stream stops when you switch apps and reconnects when you come back.
+
 ### Updating
 
 ```bash
 git pull
 make install-mac
-make install-android
+make install-android   # or: make install-ios
 ```
 
 Pairings and settings are kept.
@@ -119,7 +136,7 @@ Every connection uses TLS, and the phone pins the Mac's certificate at pairing. 
 dist/Sidecast.app/Contents/MacOS/Sidecast --test-pattern --data-dir /tmp/sidecast-test --port 47899 --test-pairing-code 123456 --no-bonjour
 ```
 
-Runs the real server/encoder/TLS/flow-control path with a synthetic test pattern. No virtual display, capture, input, sleep changes or prompts. Connect with `"$(cd mac && swift build -c release --show-bin-path)/sidecast-probe" --host 127.0.0.1 --port 47899 --code 123456 --seconds 5`, or from the Android emulator via **Add by IP** → `10.0.2.2:47899`.
+Runs the real server/encoder/TLS/flow-control path with a synthetic test pattern. No virtual display, capture, input, sleep changes or prompts. Connect with `"$(cd mac && swift build -c release --show-bin-path)/sidecast-probe" --host 127.0.0.1 --port 47899 --code 123456 --seconds 5`, from the Android emulator via **Add by IP** → `10.0.2.2:47899`, or from the iOS Simulator via **+** → `127.0.0.1:47899` (open `ios/Sidecast.xcodeproj` and run it; no Apple ID needed). `ios/SidecastUITests` drives that last one end to end.
 
 ## Troubleshooting
 
@@ -136,11 +153,12 @@ Runs the real server/encoder/TLS/flow-control path with a synthetic test pattern
 make test
 ```
 
-Runs the Mac (XCTest) and Android (JUnit) unit tests, including the shared protocol test vectors. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Runs the Mac (XCTest) and Android (JUnit) unit tests, including the shared protocol test vectors and the iOS client's logic (in SidecastKit). `make test-ios` adds the iOS app's own tests on a simulator. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```
-mac/       Swift package: SidecastKit (tested logic), Sidecast (app), SidecastProbe (CLI test client), mic driver
+mac/       Swift package: SidecastKit (tested logic, incl. the iOS client's), Sidecast (app), SidecastProbe (CLI test client), mic driver
 android/   Gradle project: protocol/ net/ video/ input/ audio/ store/ ui/
+ios/       iPhone / iPad app (UIKit) on SidecastKit; Sidecast.xcodeproj is generated from project.yml (XcodeGen)
 docs/      DECISIONS.md, PROTOCOL.md, ROADMAP.md
 scripts/   doctor.sh
 dist/      build outputs (gitignored)

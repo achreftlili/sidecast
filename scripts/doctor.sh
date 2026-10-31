@@ -83,13 +83,45 @@ else
     hint "Run: sdkmanager \"platform-tools\""
 fi
 
+# Optional: only warnings, never a failure.
+if [[ "$(uname -s)" == Darwin ]]; then
+    echo
+    echo "iPhone / iPad app (optional)"
+    if xcodebuild -version >/dev/null 2>&1; then
+        ok "$(xcodebuild -version 2>/dev/null | head -1)"
+        if xcodebuild -showsdks 2>/dev/null | grep -q -- '-sdk iphoneos'; then
+            ok "iOS SDK"
+        else
+            warn "No iOS platform in Xcode"
+            hint "Xcode → Settings → Components → iOS"
+        fi
+        if [[ -f "$REPO_DIR/ios/Local.xcconfig" ]] && grep -Eq '^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*[A-Z0-9]{10}' "$REPO_DIR/ios/Local.xcconfig" \
+            && ! grep -q 'ABCDE12345\|com.yourname.sidecast' "$REPO_DIR/ios/Local.xcconfig"; then
+            ok "ios/Local.xcconfig (Apple team and bundle identifier)"
+        else
+            warn "No ios/Local.xcconfig with your Apple team and bundle identifier (needed only for 'make install-ios')"
+            hint "cp ios/Local.xcconfig.example ios/Local.xcconfig and fill it in (a free Apple ID works)"
+        fi
+        devices="$(xcrun devicectl list devices --hide-headers 2>/dev/null | grep -Eci 'iphone|ipad' || true)"
+        if (( devices > 0 )); then
+            ok "$devices iPhone / iPad known to Xcode"
+        else
+            warn "No iPhone or iPad connected (needed only for 'make install-ios')"
+            hint "Connect it with a cable, unlock it and tap Trust; enable Settings → Privacy & Security → Developer Mode"
+        fi
+    else
+        warn "The iOS app needs Xcode (the Command Line Tools are not enough)"
+        hint "Install Xcode from the App Store, open it once, then: sudo xcode-select -s /Applications/Xcode.app"
+    fi
+fi
+
 echo
 if (( FAILED )); then
     echo "Fix the ✗ items above, then run 'make doctor' again."
     exit 1
 fi
 if [[ "$(uname -s)" == Darwin ]]; then
-    echo "Ready. Next: make install-mac, then make install-android with the phone connected."
+    echo "Ready. Next: make install-mac, then make install-android (or make install-ios) with the phone connected."
 else
     echo "Ready to build the Android app: make install-android with the phone connected."
     echo "(The computer side runs on macOS for now; Windows and Linux are on the roadmap.)"
