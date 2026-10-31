@@ -108,8 +108,17 @@ pub(crate) async fn run(tcp: TcpStream, peer: SocketAddr, hub: Arc<Hub>, accepto
     while let Ok(event) = stream_events.try_recv() {
         crate::stream::discard(event);
     }
-    // Let a final BYE leave (the writer gives up after 2 s on a stuck peer).
-    let _ = tokio::time::timeout(Duration::from_secs(3), writer_task).await;
+    // Let a final BYE leave, and keep reading until the phone closes: closing a
+    // socket with unread input (its acks and pings) sends a TCP reset, and on
+    // Windows the phone then discards the BYE it has not read yet.
+    let drain = async {
+        let mut sink = vec![0u8; 16 * 1024];
+        while matches!(reader.read(&mut sink).await, Ok(n) if n > 0) {}
+    };
+    let _ = tokio::time::timeout(Duration::from_secs(3), async {
+        let _ = tokio::join!(writer_task, drain);
+    })
+    .await;
 }
 
 struct Session {
