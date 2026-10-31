@@ -85,14 +85,16 @@ mod platform {
         out.push_str("Monitors (GDI):\n");
         for m in display::monitors() {
             out.push_str(&format!(
-                "  {}{}{}\n",
+                "  {}{}{}, monitor \"{}\", {} modes\n",
                 m.describe(),
                 if m.is_virtual_display() { ", Virtual Display Driver" } else { "" },
                 if m.attached {
                     format!(" at ({}, {}) {} Hz", m.rect.left, m.rect.top, m.refresh)
                 } else {
                     String::new()
-                }
+                },
+                m.monitor_name,
+                display::modes(&m.device).len()
             ));
         }
         out.push_str("Outputs (DXGI Desktop Duplication):\n");
