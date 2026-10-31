@@ -7,6 +7,7 @@ import com.achreftlili.sidecast.net.RetryCause
 import com.achreftlili.sidecast.net.Route
 import com.achreftlili.sidecast.net.SessionError
 import com.achreftlili.sidecast.net.SessionState
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.video.DecoderStatus
 
 data class OverlayAction(val label: String, val onClick: () -> Unit)
@@ -33,6 +34,8 @@ class OverlayPresenter(
     private val context: Context,
     private val fallbackName: String,
     private val actions: OverlayActions,
+    /** The host's OS ([HostPlatform]) once known, for advice that differs per OS. */
+    private val platform: () -> String? = { null },
 ) {
     /** [route]: the path being tried / used, shown while connecting (§1.1). */
     fun present(state: SessionState, decoder: DecoderStatus, route: Route? = null): Overlay? = when (state) {
@@ -96,8 +99,17 @@ class OverlayPresenter(
                 primary = OverlayAction(s(R.string.action_reconnect), actions::retry),
                 secondary = close(),
             )
-            SessionError.PermissionMissing ->
+            // The Screen Recording steps are macOS-only; other hosts get generic advice.
+            SessionError.PermissionMissing -> if (platform() == HostPlatform.MACOS) {
                 Overlay(s(R.string.error_permission_title), s(R.string.error_permission_detail), primary = retry, secondary = close())
+            } else {
+                Overlay(
+                    s(R.string.error_permission_title_generic),
+                    s(R.string.error_permission_detail_generic, name),
+                    primary = retry,
+                    secondary = close(),
+                )
+            }
             SessionError.ProtocolMismatch ->
                 Overlay(s(R.string.error_protocol_mismatch_title), s(R.string.error_protocol_mismatch_detail), secondary = close())
             SessionError.IdentityChanged -> Overlay(

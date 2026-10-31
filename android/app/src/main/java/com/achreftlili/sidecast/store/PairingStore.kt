@@ -2,6 +2,7 @@ package com.achreftlili.sidecast.store
 
 import android.content.Context
 import androidx.core.content.edit
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.ServerAddress
 import org.json.JSONArray
 import org.json.JSONException
@@ -52,9 +53,13 @@ class PairingStore(context: Context) : PairingRepository {
                 "addresses",
                 JSONArray().apply { for (a in mac.addresses) put(JSONObject().put("host", a.host).put("kind", a.kind)) },
             )
+            .put("platform", mac.platform)
             .toString()
 
-        /** Pairings stored before 0.4 have no addresses / serverPort: they read as empty / 0. */
+        /**
+         * Pairings stored before 0.4 have no addresses / serverPort: they read as empty / 0. Those
+         * stored before hosts announced their OS have no platform: they were all Macs.
+         */
         fun parsePairedMac(text: String): PairedMac? = try {
             val o = JSONObject(text)
             PairedMac(
@@ -72,6 +77,7 @@ class PairingStore(context: Context) : PairingRepository {
                     }
                 } ?: emptyList(),
                 serverPort = o.optInt("serverPort", 0),
+                platform = o.optString("platform", HostPlatform.MACOS),
             )
         } catch (_: JSONException) {
             null

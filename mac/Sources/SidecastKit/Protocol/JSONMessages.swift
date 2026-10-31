@@ -274,6 +274,13 @@ public struct ServerAddress: Codable, Equatable, Hashable, Sendable {
     public var addressKind: AddressKind? { AddressKind(rawValue: kind) }
 }
 
+/// The host's operating system: SERVER_HELLO `platform` and Bonjour TXT `os` (PROTOCOL §1, §4).
+public enum HostPlatform: String, Codable, Sendable, CaseIterable {
+    case macos
+    case windows
+    case linux
+}
+
 public struct ServerHello: Codable, Equatable, Sendable {
     public var `protocol`: Int
     public var serverId: String
@@ -282,14 +289,33 @@ public struct ServerHello: Codable, Equatable, Sendable {
     public var port: Int?
     /// Reachable addresses: LAN first, then Tailscale, then MagicDNS.
     public var addresses: [ServerAddress]?
+    /// Raw host OS; see `hostPlatform`. Always sent by this host.
+    public var platform: String
 
     public init(protocol: Int = SidecastProtocol.version, serverId: String, serverName: String,
-                port: Int? = nil, addresses: [ServerAddress]? = nil) {
+                port: Int? = nil, addresses: [ServerAddress]? = nil, platform: HostPlatform = .macos) {
         self.protocol = `protocol`
         self.serverId = serverId
         self.serverName = serverName
         self.port = port
         self.addresses = addresses
+        self.platform = platform.rawValue
+    }
+
+    /// nil for an OS this version does not know: show a generic computer.
+    public var hostPlatform: HostPlatform? { HostPlatform(rawValue: platform) }
+
+    private enum CodingKeys: String, CodingKey { case `protocol`, serverId, serverName, port, addresses, platform }
+
+    /// Mac hosts before `platform` existed omit it, so absent (or malformed) means macOS.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.protocol = try c.decode(Int.self, forKey: .protocol)
+        serverId = try c.decode(String.self, forKey: .serverId)
+        serverName = try c.decode(String.self, forKey: .serverName)
+        port = try c.decodeIfPresent(Int.self, forKey: .port)
+        addresses = try c.decodeIfPresent([ServerAddress].self, forKey: .addresses)
+        platform = (try? c.decodeIfPresent(String.self, forKey: .platform)) ?? HostPlatform.macos.rawValue
     }
 }
 

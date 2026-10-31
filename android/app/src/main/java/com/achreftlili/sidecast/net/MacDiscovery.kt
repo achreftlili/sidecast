@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.Protocol
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -70,6 +71,7 @@ class MacDiscovery(
             protocolVersion = txt(Protocol.TXT_VERSION),
             host = host,
             port = info.port,
+            platform = txt(Protocol.TXT_OS) ?: HostPlatform.MACOS,
         )
         publish()
     }

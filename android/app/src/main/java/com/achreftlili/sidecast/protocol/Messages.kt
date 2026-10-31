@@ -237,6 +237,8 @@ data class ServerHello(
     val port: Int? = null,
     /** Where the Mac can be reached (§1.1); null when the Mac did not say. */
     val addresses: List<ServerAddress>? = null,
+    /** The host's OS, a [HostPlatform] (unknown values are kept). Absent on the wire means macOS. */
+    val platform: String = HostPlatform.MACOS,
 ) : ServerMessage {
     override val type: Int get() = MessageType.SERVER_HELLO
 }

@@ -125,7 +125,7 @@ final class SidecastServer: SessionHost {
         do {
             let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
             if configuration.advertiseBonjour {
-                let txt = NWTXTRecord(["v": String(SidecastProtocol.version), "id": configuration.serverId])
+                let txt = NWTXTRecord(BonjourTXT.record(serverId: configuration.serverId, platform: .macos))
                 listener.service = NWListener.Service(name: configuration.serverName,
                                                       type: SidecastProtocol.bonjourServiceType,
                                                       domain: nil, txtRecord: txt)
@@ -176,7 +176,8 @@ final class SidecastServer: SessionHost {
     var serverHello: ServerHello {
         let addresses = NetworkAddresses.ordered(configuration.addresses())
         return ServerHello(serverId: configuration.serverId, serverName: configuration.serverName,
-                           port: Int(configuration.port), addresses: addresses.isEmpty ? nil : addresses)
+                           port: Int(configuration.port), addresses: addresses.isEmpty ? nil : addresses,
+                           platform: .macos)
     }
 
     var certificateFingerprint: Data { identity.fingerprint }

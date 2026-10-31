@@ -2,6 +2,7 @@ package com.achreftlili.sidecast.store
 
 import com.achreftlili.sidecast.protocol.AddressKind
 import com.achreftlili.sidecast.protocol.Base64Codec
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.ServerAddress
 import com.achreftlili.sidecast.protocol.hexToBytes
 
@@ -20,6 +21,8 @@ data class PairedMac(
     val addresses: List<ServerAddress> = emptyList(),
     /** The Mac's listening port from SERVER_HELLO; 0 when it never said. */
     val serverPort: Int = 0,
+    /** The host's OS from SERVER_HELLO, a [HostPlatform]; older pairings did not store it and are all Macs. */
+    val platform: String = HostPlatform.MACOS,
 ) {
     val fingerprint: ByteArray get() = hexToBytes(fingerprintHex)
     val token: ByteArray get() = Base64Codec.decode(tokenB64)
@@ -30,7 +33,7 @@ data class PairedMac(
 
     override fun toString(): String =
         "PairedMac(serverId=$serverId, serverName=$serverName, fingerprint=$fingerprintHex, " +
-            "lastHost=$lastHost, lastPort=$lastPort, addresses=$addresses, serverPort=$serverPort)"
+            "lastHost=$lastHost, lastPort=$lastPort, addresses=$addresses, serverPort=$serverPort, platform=$platform)"
 }
 
 /** Persistence of pairings, keyed by serverId. Implementations must be thread-safe. */
@@ -44,8 +47,8 @@ interface PairingRepository {
     fun remove(serverId: String)
 
     /**
-     * Remember where this Mac was last reached and, when SERVER_HELLO said, its addresses and
-     * port (null = keep what is stored). No-op when it is not paired.
+     * Remember where this Mac was last reached and, when SERVER_HELLO said, its addresses, port
+     * and OS (null = keep what is stored). No-op when it is not paired.
      */
     fun updateEndpoint(
         serverId: String,
@@ -54,6 +57,7 @@ interface PairingRepository {
         port: Int,
         addresses: List<ServerAddress>? = null,
         serverPort: Int? = null,
+        platform: String? = null,
     ) {
         val current = get(serverId) ?: return
         val updated = current.copy(
@@ -62,6 +66,7 @@ interface PairingRepository {
             lastPort = port,
             addresses = addresses ?: current.addresses,
             serverPort = serverPort ?: current.serverPort,
+            platform = platform ?: current.platform,
         )
         if (updated != current) save(updated)
     }

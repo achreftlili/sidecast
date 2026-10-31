@@ -74,14 +74,15 @@ final class RemoteAccessTests: XCTestCase {
         ])
         let json = String(decoding: ServerMessage.serverHello(hello).encoded().dropFirst(5), as: UTF8.self)
         XCTAssertEqual(json, #"{"addresses":[{"host":"192.168.1.20","kind":"lan"},{"host":"100.101.102.103","kind":"tailscale"},"#
-                       + #"{"host":"mac.tail1234.ts.net","kind":"tailscale-dns"}],"port":47800,"protocol":1,"serverId":"S","serverName":"Mac"}"#)
+                       + #"{"host":"mac.tail1234.ts.net","kind":"tailscale-dns"}],"platform":"macos","port":47800,"protocol":1,"#
+                       + #""serverId":"S","serverName":"Mac"}"#)
         let parser = FrameParser()
         parser.append(ServerMessage.serverHello(hello).encoded())
         XCTAssertEqual(try ServerMessage.decode(try XCTUnwrap(try parser.nextFrame())), .serverHello(hello))
-        // Without them the old shape is unchanged.
+        // Without them only the always-sent platform is added to the old shape.
         let old = String(decoding: ServerMessage.serverHello(ServerHello(serverId: "S", serverName: "Mac")).encoded().dropFirst(5),
                          as: UTF8.self)
-        XCTAssertEqual(old, #"{"protocol":1,"serverId":"S","serverName":"Mac"}"#)
+        XCTAssertEqual(old, #"{"platform":"macos","protocol":1,"serverId":"S","serverName":"Mac"}"#)
     }
 
     // MARK: - HELLO network / limits

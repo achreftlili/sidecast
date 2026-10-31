@@ -23,6 +23,18 @@ public enum SidecastProtocol {
     public static let keyframeInterval: TimeInterval = 2
 }
 
+/// The Bonjour TXT record (PROTOCOL §1).
+public enum BonjourTXT {
+    public static let versionKey = "v"
+    public static let serverIdKey = "id"
+    public static let osKey = "os"
+
+    /// What a host advertises: `v=1`, `id=<serverId>`, `os=<platform>`.
+    public static func record(serverId: String, platform: HostPlatform = .macos) -> [String: String] {
+        [versionKey: String(SidecastProtocol.version), serverIdKey: serverId, osKey: platform.rawValue]
+    }
+}
+
 /// Message type codes (PROTOCOL §4).
 public enum MessageType: UInt8, CaseIterable, Sendable {
     // Client → Server

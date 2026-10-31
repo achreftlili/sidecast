@@ -1,10 +1,11 @@
 package com.achreftlili.sidecast.ui
 
 import com.achreftlili.sidecast.net.DiscoveredMac
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.Protocol
 import com.achreftlili.sidecast.store.PairedMac
 
-/** One row of the Mac list: discovered and/or paired, merged by serverId. */
+/** One row of the list of computers: discovered and/or paired, merged by serverId. */
 data class MacListItem(
     val key: String,
     val serverId: String?,
@@ -17,6 +18,8 @@ data class MacListItem(
     val protocolVersion: String?,
     /** Not on this network, but paired with a Tailscale address: reachable remotely (§1.1). */
     val remote: Boolean = false,
+    /** The host's OS, a [HostPlatform]: TXT `os` when discovered, else what SERVER_HELLO said. */
+    val platform: String = HostPlatform.MACOS,
 ) {
     val compatible: Boolean get() = protocolVersion == null || protocolVersion == Protocol.VERSION.toString()
 }
@@ -38,6 +41,7 @@ object MacList {
                 online = true,
                 paired = mac.serverId != null && mac.serverId in pairedById,
                 protocolVersion = mac.protocolVersion,
+                platform = mac.platform,
             )
         }
         for (mac in paired) {
@@ -53,6 +57,7 @@ object MacList {
                 paired = true,
                 protocolVersion = null,
                 remote = mac.hasTailscale,
+                platform = mac.platform,
             )
         }
         return items.values.sortedWith(compareByDescending<MacListItem> { it.online }.thenBy { it.name.lowercase() })

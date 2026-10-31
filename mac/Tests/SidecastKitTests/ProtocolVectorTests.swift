@@ -105,6 +105,21 @@ final class ProtocolVectorTests: XCTestCase {
         XCTAssertEqual(ServerMessage.pong(1).encoded().dropFirst(5), wire.dropFirst(5))
     }
 
+    // §8.4 SERVER_HELLO platform
+    func testServerHelloPlatformVectors() throws {
+        func platform(_ json: String) throws -> HostPlatform? {
+            guard case .serverHello(let hello)? = try ServerMessage.decode(Frame(.serverHello, payload: Data(json.utf8))) else {
+                throw NSError(domain: "test", code: 1)
+            }
+            return hello.hostPlatform
+        }
+        XCTAssertEqual(try platform(#"{"protocol":1,"serverId":"S","serverName":"Studio","platform":"macos"}"#), .macos)
+        XCTAssertEqual(try platform(#"{"protocol":1,"serverId":"S","serverName":"Studio","platform":"windows"}"#), .windows)
+        XCTAssertEqual(try platform(#"{"protocol":1,"serverId":"S","serverName":"Studio","platform":"linux"}"#), .linux)
+        XCTAssertEqual(try platform(#"{"protocol":1,"serverId":"S","serverName":"Studio"}"#), .macos)
+        XCTAssertNil(try platform(#"{"protocol":1,"serverId":"S","serverName":"Studio","platform":"beos"}"#))
+    }
+
     private func decodeClient(_ wire: Data) throws -> ClientMessage? {
         let parser = FrameParser()
         parser.append(wire)

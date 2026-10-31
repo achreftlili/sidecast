@@ -7,6 +7,7 @@ object Protocol {
     const val SERVICE_TYPE = "_sidecast._tcp"
     const val TXT_ID = "id"
     const val TXT_VERSION = "v"
+    const val TXT_OS = "os"
 
     /** type (u8) + length (u32). */
     const val HEADER_SIZE = 5
@@ -102,6 +103,13 @@ object AddressKind {
     const val LAN = "lan"
     const val TAILSCALE = "tailscale"
     const val TAILSCALE_DNS = "tailscale-dns"
+}
+
+/** SERVER_HELLO `platform` and TXT `os` values (§1, §4): the host's operating system. */
+object HostPlatform {
+    const val MACOS = "macos"
+    const val WINDOWS = "windows"
+    const val LINUX = "linux"
 }
 
 /** HELLO `features` values (§5). */

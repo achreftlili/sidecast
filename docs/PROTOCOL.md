@@ -1,35 +1,37 @@
 # Sidecast wire protocol — version 1
 
-This is the contract between the Mac app (server) and the Android app (client).
-Both implementations MUST pass the test vectors at the end of this file.
+This is the contract between the computer app (the **host**, or server: macOS today, Windows and Linux planned)
+and the phone app (the **client**: Android today, iOS planned). Notes that mention a Mac apply to the macOS host only.
+Every implementation MUST pass the test vectors at the end of this file.
 
 ## 1. Discovery
 
 - Bonjour / DNS-SD service type: **`_sidecast._tcp`**, domain `local.`
-- Default TCP port: **47800** (configurable on the Mac). The listener uses a fixed port so manual IP entry works.
-- Instance name: the Mac's user-visible computer name (`Host.current().localizedName`).
+- Default TCP port: **47800** (configurable on the host). The listener uses a fixed port so manual IP entry works.
+- Instance name: the host's user-visible computer name (on macOS `Host.current().localizedName`).
 - TXT record:
   - `v=1` — protocol version
-  - `id=<serverId>` — stable UUID string identifying this Mac install (generated once, persisted)
+  - `id=<serverId>` — stable UUID string identifying this host install (generated once, persisted)
+  - `os=macos|windows|linux` — the host's operating system, same values as SERVER_HELLO `platform` (§4). Absent = `macos` (Mac hosts before this key); clients show an unknown value as a generic computer.
 
-The client lists discovered Macs plus previously paired Macs (by `serverId`, with last known host/port) and offers "Add by IP address" (host + optional port).
+The client lists discovered computers plus previously paired ones (by `serverId`, with last known host/port) and offers "Add by IP address" (host + optional port).
 
 ### 1.1 Remote access (over the internet)
 
-Remote access uses **Tailscale** (a WireGuard mesh VPN) on both devices: the Mac is reachable at its Tailscale address (`100.64.0.0/10`, or its MagicDNS name) from anywhere. Nothing in the protocol changes; TLS + pairing + tokens still apply on top.
+Remote access uses **Tailscale** (a WireGuard mesh VPN) on both devices: the host is reachable at its Tailscale address (`100.64.0.0/10`, or its MagicDNS name) from anywhere. Nothing in the protocol changes; TLS + pairing + tokens still apply on top.
 
-- The Mac lists its reachable addresses in SERVER_HELLO (`addresses`, §4 table), ordered LAN, then `tailscale`, then `tailscale-dns`. `kind` comes from the Mac's interface (a 100.64/10 address on Wi-Fi is `lan`), so the client trusts `kind` rather than re-deriving it. The client stores them with the pairing.
-- Connecting to a paired Mac: use the Bonjour-resolved address if the Mac is discovered on the local network; otherwise try the stored addresses in order — LAN addresses first (2.5 s connect timeout each), then Tailscale ones (6 s) — and remember the one that worked as `lastHost`.
+- The host lists its reachable addresses in SERVER_HELLO (`addresses`, §4 table), ordered LAN, then `tailscale`, then `tailscale-dns`. `kind` comes from the host's interface (a 100.64/10 address on Wi-Fi is `lan`), so the client trusts `kind` rather than re-deriving it. The client stores them with the pairing.
+- Connecting to a paired host: use the Bonjour-resolved address if the host is discovered on the local network; otherwise try the stored addresses in order — LAN addresses first (2.5 s connect timeout each), then Tailscale ones (6 s) — and remember the one that worked as `lastHost`.
 - The client must not force LAN-only routing (e.g. binding the socket to the Wi-Fi network) for non-private destinations: Tailscale addresses go through the VPN, public ones through whatever network is active. Binding to Wi-Fi is only allowed for RFC 1918 / link-local destinations.
 
 ## 2. Transport security
 
 - TCP with Nagle disabled (`TCP_NODELAY`) on both ends, wrapped in **TLS (1.2 minimum, 1.3 preferred)**.
-- The Mac presents a **self-signed EC P-256 certificate**, generated once per install and persisted.
+- The host presents a **self-signed EC P-256 certificate**, generated once per install and persisted.
 - **Certificate fingerprint** = SHA-256 of the leaf certificate's DER encoding (32 raw bytes). Shown as lowercase hex.
 - Client trust model (trust on first pairing):
-  - Not yet paired with this Mac: accept any certificate, remember its fingerprint for the pairing proof.
-  - Paired: the leaf fingerprint MUST equal the pinned fingerprint, otherwise abort and tell the user "This Mac's identity changed — pair again".
+  - Not yet paired with this host: accept any certificate, remember its fingerprint for the pairing proof.
+  - Paired: the leaf fingerprint MUST equal the pinned fingerprint, otherwise abort and tell the user "This computer's identity changed — pair again".
 - The client does not verify hostname or chain (self-signed); pinning replaces that.
 
 ## 3. Framing
@@ -72,7 +74,7 @@ payload : `length` bytes
 
 | Type | Name | Payload |
 |------|------|---------|
-| `0x81` | SERVER_HELLO | JSON `{"protocol": 1, "serverId": string, "serverName": string, "port"?: int, "addresses"?: [{"host": string, "kind": "lan" \| "tailscale" \| "tailscale-dns"}]}` |
+| `0x81` | SERVER_HELLO | JSON `{"protocol": 1, "serverId": string, "serverName": string, "port"?: int, "addresses"?: [{"host": string, "kind": "lan" \| "tailscale" \| "tailscale-dns"}], "platform"?: "macos" \| "windows" \| "linux"}` |
 | `0x82` | PAIR_CHALLENGE | JSON `{"expiresInSec": int, "attemptsLeft": int}` |
 | `0x83` | AUTH_RESULT | JSON `{"ok": bool, "token"?: b64, "reason"?: string, "attemptsLeft"?: int}` |
 | `0x84` | STREAM_CONFIG | JSON, see §6 |
@@ -82,7 +84,9 @@ payload : `length` bytes
 | `0x88` | MIC_CONTROL | JSON `{"active": bool, "sampleRate"?: 48000, "channels"?: 1}`, see §7.2 |
 | `0x89` | CURSOR | binary `x: f32`, `y: f32` (big-endian, normalized 0…1 to the video frame), see §7.3 |
 
-`reason` values: `bad_code`, `too_many_attempts`, `pairing_expired`, `unknown_device`, `protocol_mismatch`, `replaced` (another phone took over), `server_shutdown`, `display_failed`, `permission_missing` (Screen Recording not granted on the Mac).
+`reason` values: `bad_code`, `too_many_attempts`, `pairing_expired`, `unknown_device`, `protocol_mismatch`, `replaced` (another phone took over), `server_shutdown`, `display_failed`, `permission_missing` (the host may not capture the screen, e.g. Screen Recording not granted on a Mac).
+
+SERVER_HELLO `platform` is the host's operating system. Hosts always send it; a SERVER_HELLO without it comes from an older Mac host, so absent = `"macos"`. Clients show an unknown value as a generic computer, and use the platform only for display and OS-specific advice: the protocol is the same for every OS. See §8.4.
 
 ## 5. Session flow
 
@@ -92,7 +96,7 @@ C → S  HELLO
 S → C  SERVER_HELLO
         ├─ client has a token for serverId ─→ C → S AUTH
         └─ otherwise ───────────────────────→ C → S PAIR_START
-                                               S shows code on the Mac
+                                               S shows code on the host
                                                S → C PAIR_CHALLENGE
                                                C asks the user for the code
                                                C → S PAIR_PROOF   (retry allowed while attemptsLeft > 0)
@@ -126,7 +130,7 @@ C → S  FRAME_ACK per frame, PING every 1 s, TOUCH as the user touches
 
 ### Pairing
 
-1. On PAIR_START the server generates a uniformly random 6-digit code (`000000`–`999999`), shows it on the Mac ("Enter this code on <deviceName>"), and starts a 120 s timer. 5 attempts.
+1. On PAIR_START the server generates a uniformly random 6-digit code (`000000`–`999999`), shows it on the host's screen ("Enter this code on <deviceName>"), and starts a 120 s timer. 5 attempts.
 2. Client computes, over the TLS connection's server leaf certificate:
 
 ```
@@ -138,12 +142,12 @@ proof = HMAC-SHA256( key = ASCII(code), message = certFingerprint(32 bytes) ‖ 
    - Wrong, last attempt: AUTH_RESULT `{ok:false, reason:"too_many_attempts", attemptsLeft:0}` + BYE `too_many_attempts`.
    - Expired: AUTH_RESULT `{ok:false, reason:"pairing_expired"}` + BYE.
    - Right: server creates a 32-byte random **token**, stores `SHA-256(token)` with `deviceId`, `deviceName`, `pairedAt`, replies AUTH_RESULT `{ok:true, token}`. The session proceeds to streaming immediately.
-4. Client stores per `serverId`: `fingerprint`, `token`, `serverName`, last host + port.
+4. Client stores per `serverId`: `fingerprint`, `token`, `serverName`, `platform`, last host + port.
 
 ### AUTH
 
 - Server looks up `deviceId`, compares `SHA-256(token)` in constant time.
-- OK → AUTH_RESULT `{ok:true}`. Unknown/mismatch → AUTH_RESULT `{ok:false, reason:"unknown_device"}` + BYE; the client deletes its stored pairing for that Mac and pairs again on the next attempt.
+- OK → AUTH_RESULT `{ok:true}`. Unknown/mismatch → AUTH_RESULT `{ok:false, reason:"unknown_device"}` + BYE; the client deletes its stored pairing for that host and pairs again on the next attempt.
 - Only an authenticated client can take over the stream. When a second client authenticates, the current one gets BYE `replaced`.
 - Any connection that has not authenticated within 150 s (pairing included) is closed.
 
@@ -208,9 +212,9 @@ pointers[count] : { id: u8, x: f32, y: f32 }
 
 ### 7.1 Keyboard (TEXT / KEY, client → server)
 
-The phone's on-screen keyboard (or a hardware keyboard attached to the phone) types into whatever is focused on the Mac.
+The phone's on-screen keyboard (or a hardware keyboard attached to the phone) types into whatever is focused on the computer.
 
-- **TEXT** (`0x14`): payload = UTF-8 text, 1…4096 bytes. The server types it as Unicode, independent of the Mac's keyboard layout (accents, emoji and non-Latin scripts work). Control characters are not sent as TEXT; the client uses KEY for them.
+- **TEXT** (`0x14`): payload = UTF-8 text, 1…4096 bytes. The server types it as Unicode, independent of the computer's keyboard layout (accents, emoji and non-Latin scripts work). Control characters are not sent as TEXT; the client uses KEY for them.
 - **KEY** (`0x15`): payload = 2 bytes `key: u8`, `modifiers: u8`. The server presses and releases the key with the modifiers held.
 
 | `key` | Key | | `key` | Key |
@@ -225,31 +229,31 @@ The phone's on-screen keyboard (or a hardware keyboard attached to the phone) ty
 
 `modifiers` bitmask: `1` Shift, `2` Control, `4` Option/Alt, `8` Command/Meta. Unknown keys or bits are ignored.
 
-- Both are accepted only from an authenticated, streaming client, and only when the Mac's "touch/input" setting is on and Accessibility is granted. Otherwise they are silently ignored (like TOUCH). Malformed payloads are ignored, not fatal.
+- Both are accepted only from an authenticated, streaming client, and only when the host allows input (on a Mac: the "touch/input" setting is on and Accessibility is granted). Otherwise they are silently ignored (like TOUCH). Malformed payloads are ignored, not fatal.
 - Older servers skip both types as unknown; no version bump is needed.
 
-### 7.2 Microphone (phone mic → "Sidecast Microphone" on the Mac)
+### 7.2 Microphone (phone mic → a virtual microphone on the computer)
 
-The Mac exposes a virtual input device, **Sidecast Microphone**. When any Mac app records from it, the Mac asks the phone to stream its microphone.
+The host exposes a virtual input device (on a Mac, **Sidecast Microphone**). When any app on the computer records from it, the host asks the phone to stream its microphone.
 
 - The client advertises support with `"features": ["mic"]` in HELLO.
-- **MIC_CONTROL** (`0x88`, server → client, JSON): `{"active": true, "sampleRate": 48000, "channels": 1}` asks the phone to start capturing; `{"active": false}` asks it to stop. The server sends `active:true` only to an authenticated streaming client that advertised `mic`, while the Mac's virtual microphone is in use by some app; it sends `active:false` when that stops. A new streaming session starts with the mic off.
-- **MIC_STATE** (`0x17`, client → server, JSON): the phone reports `{"capturing": true}` once audio flows, or `{"capturing": false, "reason": r}` with `r` ∈ `stopped` (after `active:false`), `disabled` (user turned the feature off on the phone), `permission_denied` (Android RECORD_AUDIO refused), `background` (app not in the foreground), `unavailable` (mic busy / AudioRecord failed). The Mac shows this to the user.
+- **MIC_CONTROL** (`0x88`, server → client, JSON): `{"active": true, "sampleRate": 48000, "channels": 1}` asks the phone to start capturing; `{"active": false}` asks it to stop. The server sends `active:true` only to an authenticated streaming client that advertised `mic`, while the host's virtual microphone is in use by some app; it sends `active:false` when that stops. A new streaming session starts with the mic off.
+- **MIC_STATE** (`0x17`, client → server, JSON): the phone reports `{"capturing": true}` once audio flows, or `{"capturing": false, "reason": r}` with `r` ∈ `stopped` (after `active:false`), `disabled` (user turned the feature off on the phone), `permission_denied` (Android RECORD_AUDIO refused), `background` (app not in the foreground), `unavailable` (mic busy / AudioRecord failed). The host shows this to the user.
 - **AUDIO** (`0x16`, client → server, binary):
   ```
   seq     : u32 big-endian — 0 for the first packet after each MIC_CONTROL active:true, +1 per packet
   samples : PCM signed 16-bit **little-endian**, mono, 48 000 Hz — 1…4800 samples (480 = 10 ms recommended)
   ```
   The phone captures with Android's voice-communication source (echo cancellation, noise suppression) and sends every 10 ms. It never sends AUDIO unless the last MIC_CONTROL was `active:true` and it is capturing.
-- Server side: a jitter buffer targeting ~40 ms; if more than ~150 ms is queued, the oldest audio is dropped. Gaps (seq jumps, underruns) are filled with silence. When no client is capturing, Sidecast Microphone delivers silence.
+- Server side: a jitter buffer targeting ~40 ms; if more than ~150 ms is queued, the oldest audio is dropped. Gaps (seq jumps, underruns) are filled with silence. When no client is capturing, the virtual microphone delivers silence.
 - AUDIO/MIC_STATE before authentication, or without a pending `active:true`, are ignored. Malformed payloads (odd byte count, 0 or > 4800 samples) are ignored, not fatal.
 
 ### 7.3 Input mode (touch / trackpad)
 
 - **INPUT_MODE** (`0x18`, client → server, JSON): `{"mode": "touch"}` (default: the phone is a touchscreen, positions are absolute) or `{"mode": "trackpad"}` (the phone is a laptop trackpad: finger movement moves the cursor relatively). The client sends it right after authentication and whenever the user toggles; the server applies it to subsequent TOUCH events (a mode change ends the current gesture cleanly: buttons released, scroll ended). Unknown modes are ignored. Older servers skip the message.
 - TOUCH payloads are unchanged in both modes (normalized absolute coordinates); the server derives relative motion in trackpad mode.
-- **CURSOR** (`0x89`, server → client, binary, 8 bytes): the Mac's pointer position normalized to the streamed display (0,0 top-left … 1,1 bottom-right). Sent in trackpad mode whenever the pointer moves (throttled to ≤ 60 per second) and once right after the client switches to trackpad mode (and after each STREAM_CONFIG while in trackpad mode). The client draws a large pointer at that position (letterbox-aware) only while in trackpad mode. When the pointer is not on the streamed display the server sends -1,-1; the client hides its pointer whenever x or y is < 0 or > 1.
-- Clicks are injected human-like on the Mac (pointer move to the target, button down, ~40 ms hold, button up) because some apps (Chromium/Electron, e.g. VS Code) ignore zero-duration synthetic clicks.
+- **CURSOR** (`0x89`, server → client, binary, 8 bytes): the host's pointer position normalized to the streamed display (0,0 top-left … 1,1 bottom-right). Sent in trackpad mode whenever the pointer moves (throttled to ≤ 60 per second) and once right after the client switches to trackpad mode (and after each STREAM_CONFIG while in trackpad mode). The client draws a large pointer at that position (letterbox-aware) only while in trackpad mode. When the pointer is not on the streamed display the server sends -1,-1; the client hides its pointer whenever x or y is < 0 or > 1.
+- Hosts inject clicks human-like (pointer move to the target, button down, ~40 ms hold, button up) because some apps (Chromium/Electron, e.g. VS Code) ignore zero-duration synthetic clicks.
 - Trackpad-mode gestures (server side): 1-finger move = move cursor (with acceleration); tap = click at the cursor; double tap = double click; double-tap-and-hold then move = drag; 2-finger tap = right click; 2-finger move = scroll; pinch = zoom; 3/4-finger swipes = navigation (as in touch mode). Long press does nothing in trackpad mode.
 
 ## 8. Test vectors
@@ -324,4 +328,16 @@ PING t = 1:
 
 ```
 13 00 00 00 08 00 00 00 00 00 00 00 01
+```
+
+### 8.4 SERVER_HELLO `platform`
+
+How a client reads the host's OS from these SERVER_HELLO payloads (key order and spacing do not matter):
+
+```
+{"protocol":1,"serverId":"S","serverName":"Studio","platform":"macos"}    → macOS
+{"protocol":1,"serverId":"S","serverName":"Studio","platform":"windows"}  → Windows
+{"protocol":1,"serverId":"S","serverName":"Studio","platform":"linux"}    → Linux
+{"protocol":1,"serverId":"S","serverName":"Studio"}                       → macOS (a Mac host older than the field)
+{"protocol":1,"serverId":"S","serverName":"Studio","platform":"beos"}     → unknown: a generic computer
 ```
