@@ -64,9 +64,12 @@ async fn pairs_streams_and_authenticates_again() {
     phone.send(ClientMessage::FrameAck(0)).await;
     phone.send(ClientMessage::Ping(42)).await;
     phone.expect("PONG", |m| matches!(m, ServerMessage::Pong(42)).then_some(())).await;
-    // Sequence numbers increase by one.
-    let next = phone.video_frame().await;
-    assert_eq!(next.seq, 1);
+    // Sequence numbers increase by one (waiting for the PONG may have acked a few frames).
+    let a = phone.video_frame().await;
+    phone.send(ClientMessage::FrameAck(a.seq)).await;
+    let b = phone.video_frame().await;
+    assert!(a.seq >= 1);
+    assert_eq!(b.seq, a.seq + 1);
     drop(phone);
 
     assert_eq!(server.handle.paired_devices().iter().map(|d| d.device_id.as_str()).collect::<Vec<_>>(), ["phone-a"]);
