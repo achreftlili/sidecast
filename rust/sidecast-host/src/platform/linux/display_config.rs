@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use zbus::zvariant::{OwnedValue, Value};
 
-use super::monitors::{self, LogicalConfig, LogicalMonitor, MonitorInfo};
+use super::monitors::{self, LayoutMode, LogicalConfig, LogicalMonitor, MonitorInfo};
 
 type MonitorSpec = (String, String, String, String);
 type Mode = (String, i32, i32, f64, f64, Vec<f64>, HashMap<String, OwnedValue>);
@@ -34,14 +34,11 @@ trait DisplayConfig {
 
 /// `ApplyMonitorsConfig` method: apply without saving or asking.
 const METHOD_TEMPORARY: u32 = 1;
-/// `layout-mode` 2: positions in logical pixels (Wayland's default).
-const LAYOUT_LOGICAL: u32 = 2;
-
 struct Layout {
     serial: u32,
     monitors: Vec<MonitorInfo>,
     logical: Vec<LogicalMonitor>,
-    logical_layout: bool,
+    mode: Option<LayoutMode>,
 }
 
 async fn layout(proxy: &DisplayConfigProxy<'_>) -> zbus::Result<Layout> {
@@ -69,8 +66,8 @@ async fn layout(proxy: &DisplayConfigProxy<'_>) -> zbus::Result<Layout> {
             connectors: specs.into_iter().map(|s| s.0).collect(),
         })
         .collect();
-    let mode = properties.get("layout-mode").and_then(|v| u32::try_from(v).ok());
-    Ok(Layout { serial, monitors, logical, logical_layout: mode == Some(LAYOUT_LOGICAL) })
+    let mode = LayoutMode::from_dbus(properties.get("layout-mode").and_then(|v| u32::try_from(v).ok()));
+    Ok(Layout { serial, monitors, logical, mode })
 }
 
 /// The connectors present now (to recognise the monitor a stream adds).
@@ -95,14 +92,12 @@ pub async fn scale_new_monitor(
 ) -> Result<NewMonitor, String> {
     let proxy = DisplayConfigProxy::new(connection).await.map_err(|e| e.to_string())?;
     let layout = layout(&proxy).await.map_err(|e| format!("DisplayConfig: {e}"))?;
-    if !layout.logical_layout {
-        return Err("the desktop uses physical layout mode".into());
-    }
+    let mode = layout.mode.ok_or("DisplayConfig reports no layout mode")?;
     let monitor = monitors::find_new_monitor(before, &layout.monitors, size)
         .ok_or("the virtual monitor is not in DisplayConfig")?
         .connector
         .clone();
-    let configs = monitors::with_scale(&layout.logical, &layout.monitors, &monitor, scale)?;
+    let configs = monitors::with_scale(&layout.logical, &layout.monitors, mode, &monitor, scale)?;
     let position = configs
         .iter()
         .find(|c| c.monitors.iter().any(|(connector, _)| *connector == monitor))

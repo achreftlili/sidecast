@@ -59,11 +59,33 @@ fn logical_width(monitors: &[MonitorInfo], logical: &LogicalMonitor, scale: f64)
     (pixels as f64 / scale).round() as i32
 }
 
-/// The current layout with `connector` at `scale`. Monitors to its right move
-/// left or right by the change in its width, so the layout stays connected.
+/// How Mutter places monitors (`layout-mode` of `GetCurrentState`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayoutMode {
+    /// Positions in logical pixels: a monitor's width there shrinks with its scale.
+    Logical,
+    /// Positions in physical pixels (Mutter without fractional scaling): integer
+    /// scales only, and a scale change moves nothing.
+    Physical,
+}
+
+impl LayoutMode {
+    /// `1` physical, `2` logical (`org.gnome.Mutter.DisplayConfig`).
+    pub fn from_dbus(raw: Option<u32>) -> Option<LayoutMode> {
+        match raw {
+            Some(1) => Some(LayoutMode::Physical),
+            Some(2) => Some(LayoutMode::Logical),
+            _ => None,
+        }
+    }
+}
+
+/// The current layout with `connector` at `scale`. In logical mode, monitors to
+/// its right move by the change in its width, so the layout stays connected.
 pub fn with_scale(
     logical: &[LogicalMonitor],
     monitors: &[MonitorInfo],
+    mode: LayoutMode,
     connector: &str,
     scale: f64,
 ) -> Result<Vec<LogicalConfig>, String> {
@@ -72,8 +94,12 @@ pub fn with_scale(
         return Err(format!("Mutter does not offer {:.0} % for {connector} ({:?})", scale * 100.0, monitor.scales));
     }
     let target = logical.iter().find(|l| l.connectors.iter().any(|c| c == connector)).ok_or("no logical monitor")?;
-    let old_width = logical_width(monitors, target, target.scale);
-    let delta = logical_width(monitors, target, scale) - old_width;
+    let (old_scale, new_scale) = match mode {
+        LayoutMode::Logical => (target.scale, scale),
+        LayoutMode::Physical => (1.0, 1.0),
+    };
+    let old_width = logical_width(monitors, target, old_scale);
+    let delta = logical_width(monitors, target, new_scale) - old_width;
     let right_edge = target.x + old_width;
     let mut configs = Vec::new();
     for l in logical {
@@ -129,7 +155,7 @@ mod tests {
         // What headless Mutter reports with a Sidecast monitor to the right.
         let monitors = [monitor("Meta-0", 1280, 720, &[1.0]), monitor("Meta-1", 2400, 1080, &[1.0, 2.0])];
         let layout = [logical(0, 1.0, true, "Meta-0"), logical(1280, 1.0, false, "Meta-1")];
-        let configs = with_scale(&layout, &monitors, "Meta-1", 2.0).unwrap();
+        let configs = with_scale(&layout, &monitors, LayoutMode::Logical, "Meta-1", 2.0).unwrap();
         assert_eq!(
             configs,
             [
@@ -162,15 +188,21 @@ mod tests {
         ];
         let layout =
             [logical(0, 1.0, true, "DP-1"), logical(1920, 1.0, false, "Meta-1"), logical(4320, 1.0, false, "HDMI-1")];
-        let configs = with_scale(&layout, &monitors, "Meta-1", 2.0).unwrap();
+        let configs = with_scale(&layout, &monitors, LayoutMode::Logical, "Meta-1", 2.0).unwrap();
         assert_eq!(configs.iter().map(|c| (c.x, c.scale)).collect::<Vec<_>>(), [(0, 1.0), (1920, 2.0), (3120, 1.0)]);
+        // Physical layout (Mutter without fractional scaling): positions are pixels, nothing moves.
+        let configs = with_scale(&layout, &monitors, LayoutMode::Physical, "Meta-1", 2.0).unwrap();
+        assert_eq!(configs.iter().map(|c| (c.x, c.scale)).collect::<Vec<_>>(), [(0, 1.0), (1920, 2.0), (4320, 1.0)]);
+        assert_eq!(LayoutMode::from_dbus(Some(1)), Some(LayoutMode::Physical));
+        assert_eq!(LayoutMode::from_dbus(Some(2)), Some(LayoutMode::Logical));
+        assert_eq!(LayoutMode::from_dbus(None), None);
     }
 
     #[test]
     fn refuses_scales_mutter_does_not_offer() {
         let monitors = [monitor("Meta-1", 1280, 720, &[1.0])];
         let layout = [logical(0, 1.0, true, "Meta-1")];
-        assert!(with_scale(&layout, &monitors, "Meta-1", 2.0).is_err());
-        assert!(with_scale(&layout, &monitors, "Meta-9", 1.0).is_err());
+        assert!(with_scale(&layout, &monitors, LayoutMode::Logical, "Meta-1", 2.0).is_err());
+        assert!(with_scale(&layout, &monitors, LayoutMode::Logical, "Meta-9", 1.0).is_err());
     }
 }
