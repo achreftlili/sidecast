@@ -1,6 +1,9 @@
 import CoreGraphics
 import Foundation
 
+// CGKeyCode / CGEventFlags exist only in macOS's CoreGraphics; the iOS client
+// sends KEY messages and never injects keys, so it does not need this part.
+#if os(macOS)
 /// A key press to inject: macOS virtual key code + the flags held with it.
 public struct KeyStroke: Equatable, Sendable {
     public var virtualKey: CGKeyCode
@@ -76,6 +79,8 @@ public enum MacKeyMapping {
                          flags: eventFlags(for: event.keyModifiers).union(intrinsicFlags(for: key)))
     }
 }
+
+#endif
 
 /// Splits TEXT into pieces small enough for one Unicode keyboard event each.
 public enum UnicodeTyping {
