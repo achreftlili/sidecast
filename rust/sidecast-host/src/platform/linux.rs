@@ -14,6 +14,8 @@
 
 use sidecast_server::backend::{BackendError, Backends};
 
-pub fn backends() -> Result<Backends, BackendError> {
+use super::PlatformOptions;
+
+pub fn backends(_options: &PlatformOptions) -> Result<Backends, BackendError> {
     Err(BackendError::not_supported("the Linux host is not supported yet (planned: ROADMAP P3); try --test-pattern"))
 }

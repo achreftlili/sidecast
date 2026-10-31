@@ -79,9 +79,16 @@ jobs:
         run: cargo clippy -p sidecast-server -p sidecast-host -p sidecast-probe --no-default-features --all-targets -- -D warnings
       - name: Tests
         run: cargo test
+        env:
+          # Windows: the SendInput test may move the pointer of this throwaway desktop.
+          SIDECAST_TEST_REAL_INPUT: ${{ runner.os == 'Windows' && '1' || '' }}
       - name: Host ↔ probe end to end
         working-directory: .
         run: ./scripts/conformance.sh --rust-only
+      - name: Windows host with its real backends (capture, encoders, input) ↔ probe
+        if: runner.os == 'Windows'
+        working-directory: .
+        run: ./scripts/windows-e2e.sh
 
   conformance:
     name: Swift ↔ Rust conformance

@@ -157,6 +157,11 @@ pub struct HostSettings {
     pub port: u16,
     pub keep_awake: bool,
     pub mic_enabled: bool,
+    /// Hosts that can also stream an existing monitor (Windows without a
+    /// virtual display driver): which one, by the platform's name for it.
+    /// `None` = automatic.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monitor: Option<String>,
 }
 
 impl Default for HostSettings {
@@ -171,6 +176,7 @@ impl Default for HostSettings {
             port: DEFAULT_PORT,
             keep_awake: true,
             mic_enabled: true,
+            monitor: None,
         }
     }
 }
@@ -191,6 +197,7 @@ impl HostSettings {
         if self.port < 1024 {
             self.port = defaults.port;
         }
+        self.monitor = self.monitor.map(|m| m.trim().to_owned()).filter(|m| !m.is_empty());
         self
     }
 
@@ -338,9 +345,16 @@ mod tests {
     fn settings_round_trip_and_sanitize() {
         let dir = DataDir::new(scratch("settings"));
         assert_eq!(dir.load_settings(), HostSettings::default());
-        let custom = HostSettings { fps: 30, max_bitrate_mbps: 20, ..HostSettings::default() };
+        let custom = HostSettings {
+            fps: 30,
+            max_bitrate_mbps: 20,
+            monitor: Some(r"\\.\DISPLAY2".into()),
+            ..HostSettings::default()
+        };
         dir.save_settings(&custom).unwrap();
         assert_eq!(dir.load_settings(), custom);
+        fs::write(dir.settings_path(), r#"{"monitor":"  "}"#).unwrap();
+        assert_eq!(dir.load_settings().monitor, None, "a blank monitor means automatic");
         fs::write(dir.settings_path(), r#"{"fps":75,"maxBitrateMbps":500,"resolutionScale":0.3}"#).unwrap();
         let fixed = dir.load_settings();
         assert_eq!((fixed.fps, fixed.max_bitrate_mbps, fixed.resolution_scale), (60, 100, 1.0));
