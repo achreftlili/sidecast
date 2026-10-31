@@ -1,0 +1,28 @@
+[package]
+name = "sidecast-host"
+description = "Sidecast host for Windows and Linux (command line; platform backends plug into sidecast-server)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "sidecast-host"
+path = "src/main.rs"
+
+[features]
+default = ["openh264"]
+# Software H.264 encoder; without it the host has no encoder until a platform backend provides one.
+openh264 = ["sidecast-server/openh264"]
+
+[dependencies]
+sidecast-core.workspace = true
+sidecast-server.workspace = true
+
+log.workspace = true
+tokio = { workspace = true, features = ["signal"] }
+
+[lints]
+workspace = true
