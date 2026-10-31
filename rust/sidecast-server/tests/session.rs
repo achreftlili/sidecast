@@ -421,3 +421,31 @@ async fn a_backend_that_cannot_capture_says_why() {
     assert_eq!(phone.expect_close().await.as_deref(), Some("permission_missing"));
     server.stop().await;
 }
+
+#[tokio::test]
+async fn every_handshake_presents_the_pinned_certificate() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let _port = PORT_LOCK.lock().await;
+    let server = start_server(FakeDisplay::default()).await;
+    // One client config, as a phone keeps one: it would resume a session if the host allowed it,
+    // and a resumed handshake carries no certificate to check against the pin.
+    let config = client_config();
+    let hello = ClientMessage::Hello(sidecast_core::protocol::Hello::new(
+        "resumer",
+        "phone",
+        sidecast_core::protocol::ScreenInfo::new(1920, 1080, 420, 60.0),
+        vec![sidecast_core::protocol::CodecInfo::new("h264", 1920, 1080)],
+    ));
+    for attempt in 0..3 {
+        let mut tls = tls_handshake(config.clone()).await;
+        // Exchange a message so TLS 1.3 tickets, if any were sent, reach the client's cache.
+        tls.write_all(&hello.encode()).await.unwrap();
+        let mut buffer = [0u8; 512];
+        let _ = tokio::time::timeout(Duration::from_secs(2), tls.read(&mut buffer)).await;
+        let connection = tls.get_ref().1;
+        assert_eq!(connection.handshake_kind(), Some(rustls::HandshakeKind::Full), "handshake {attempt}");
+        let leaf = &connection.peer_certificates().expect("a certificate")[0];
+        assert_eq!(sidecast_core::security::certificate_fingerprint(leaf), server.handle.fingerprint());
+    }
+    server.stop().await;
+}
