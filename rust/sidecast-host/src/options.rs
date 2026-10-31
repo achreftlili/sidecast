@@ -24,12 +24,14 @@ pub struct Options {
     pub diagnose: bool,
     /// Test mode: send MIC_CONTROL active:true as soon as a mic-capable phone streams.
     pub test_mic_active: bool,
+    /// No tray icon or notifications (Linux), only the console.
+    pub no_tray: bool,
     pub verbose: bool,
     pub help: bool,
 }
 
 pub const USAGE: &str = "\
-Usage: sidecast-host [--data-dir DIR] [--port N] [--name NAME] [--monitor NAME] [--no-mdns] [--verbose]
+Usage: sidecast-host [--data-dir DIR] [--port N] [--name NAME] [--monitor NAME] [--no-mdns] [--no-tray] [--verbose]
        sidecast-host --diagnose
        sidecast-host --test-pattern --data-dir DIR [--port N] [--test-pairing-code 123456]
                      [--no-mdns] [--fps 30|60|120] [--max-mbps N] [--test-mic-active] [--verbose]
@@ -42,9 +44,11 @@ Usage: sidecast-host [--data-dir DIR] [--port N] [--name NAME] [--monitor NAME] 
   --no-mdns             do not advertise _sidecast._tcp (alias: --no-bonjour)
   --name NAME           name shown on the phone (default: this computer's name)
   --monitor NAME        stream this existing monitor instead of a virtual display
-                        (Windows: a device name such as \\\\.\\DISPLAY2, or `primary`)
-  --diagnose            list the monitors, virtual display driver, encoders and virtual
-                        audio cable this computer offers, then exit
+                        (Windows: a device name such as \\\\.\\DISPLAY2; Linux on GNOME: a
+                        connector such as DP-1; or `primary`)
+  --diagnose            list what this computer offers the host (monitors, encoders,
+                        virtual display, audio), then exit
+  --no-tray             no tray icon or pairing notifications (Linux); the console still works
   --fps N, --max-mbps N stream settings for this run
   --test-mic-active     ask a mic-capable phone for its microphone at once (test pattern)
   --verbose             debug logging, including every TOUCH MOVE";
@@ -101,6 +105,7 @@ impl Options {
                 }
                 "--diagnose" => o.diagnose = true,
                 "--test-mic-active" => o.test_mic_active = true,
+                "--no-tray" => o.no_tray = true,
                 "--verbose" | "-v" => o.verbose = true,
                 "--help" | "-h" => o.help = true,
                 other => return Err(OptionError(format!("unknown argument {other}\n{USAGE}"))),
@@ -145,7 +150,8 @@ mod tests {
             "--verbose",
         ])
         .unwrap();
-        assert!(o.test_pattern && o.verbose && !o.mdns);
+        assert!(o.test_pattern && o.verbose && !o.mdns && !o.no_tray);
+        assert!(parse(&["--no-tray"]).unwrap().no_tray);
         assert_eq!(o.port, Some(47895));
         assert_eq!(o.fps, Some(30));
         assert_eq!(o.test_pairing_code.unwrap().digits(), "123456");

@@ -5,19 +5,22 @@
 //!   Virtual Display Driver (or an existing monitor), DXGI Desktop
 //!   Duplication, Media Foundation encoders, SendInput, SetThreadExecutionState
 //!   and an optional virtual audio cable for the phone's microphone.
-//! - Linux (ROADMAP P3): Mutter ScreenCast `RecordVirtual` + PipeWire,
-//!   RemoteDesktop portal (libei), logind inhibitor, a PipeWire virtual
-//!   source, VA-API/NVENC with OpenH264 as the fallback.
+//! - Linux (ROADMAP P3, `linux/`): Mutter ScreenCast `RecordVirtual` (or an
+//!   existing monitor) + PipeWire on GNOME, the xdg-desktop-portal elsewhere on
+//!   Wayland, the RemoteDesktop session for input, a logind inhibitor, a
+//!   PipeWire virtual source, GStreamer hardware encoders with OpenH264 as the
+//!   fallback, and a tray icon.
 
-#[cfg(target_os = "linux")]
+// The pure parts of both (key, pixel and coordinate mapping; Windows: the
+// driver's settings file) are compiled and unit-tested on every OS.
+#[cfg(any(target_os = "linux", test))]
 mod linux;
-// Its pure parts (key and coordinate mapping, pixel conversion, the driver's
-// settings file) are compiled and unit-tested on every OS.
 #[cfg(any(target_os = "windows", test))]
 pub mod windows;
 
 use std::sync::{Arc, Mutex};
 
+use sidecast_server::ServerEvent;
 use sidecast_server::backend::{BackendError, Backends};
 
 /// What the host passes to its platform backends.
@@ -66,7 +69,9 @@ pub fn diagnose() -> String {
     let mut report = String::new();
     #[cfg(target_os = "windows")]
     report.push_str(&windows::diagnose());
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    report.push_str(&linux::diagnose());
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     report.push_str("No platform backends on this OS yet; --test-pattern works everywhere.\n");
     let encoders: Vec<String> = crate::host::builtin_encoders().iter().map(|e| e.name().to_owned()).collect();
     report.push_str(&format!(
@@ -74,4 +79,34 @@ pub fn diagnose() -> String {
         if encoders.is_empty() { "none".into() } else { encoders.join(", ") }
     ));
     report
+}
+
+/// A click in the console host's desktop integration (the Linux tray icon menu).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub enum UiCommand {
+    Forget { device_id: String, name: String },
+    Quit,
+}
+
+/// The console host's desktop integration (tray icon, notifications), where
+/// the OS has one. (Windows has its own tray app, `sidecast-tray`.)
+pub trait DesktopUi: Send + Sync {
+    /// Status, pairing code and streaming changes.
+    fn server_event(&self, event: &ServerEvent);
+
+    /// The paired phones as (device id, name).
+    fn set_devices(&self, devices: Vec<(String, String)>);
+}
+
+/// Starts the tray icon of the console host where this OS has one (Linux: a
+/// StatusNotifierItem); `None` elsewhere.
+pub fn start_desktop_ui(commands: impl Fn(UiCommand) + Send + Sync + 'static) -> Option<Arc<dyn DesktopUi>> {
+    #[cfg(target_os = "linux")]
+    return Some(Arc::new(linux::start_desktop_ui(commands)));
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = commands;
+        None
+    }
 }
