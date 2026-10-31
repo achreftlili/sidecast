@@ -1,0 +1,111 @@
+//! Mutter's `org.gnome.Mutter.DisplayConfig`: gives the virtual monitor the
+//! stream's scale (200 % when the phone asked for HiDPI). Applied with the
+//! "temporary" method: no confirmation dialog, nothing written to the user's
+//! saved layout, gone with the virtual monitor.
+
+use std::collections::HashMap;
+
+use zbus::zvariant::{OwnedValue, Value};
+
+use super::monitors::{self, LogicalConfig, LogicalMonitor, MonitorInfo};
+
+type MonitorSpec = (String, String, String, String);
+type Mode = (String, i32, i32, f64, f64, Vec<f64>, HashMap<String, OwnedValue>);
+type Monitor = (MonitorSpec, Vec<Mode>, HashMap<String, OwnedValue>);
+type Logical = (i32, i32, f64, u32, bool, Vec<MonitorSpec>, HashMap<String, OwnedValue>);
+type State = (u32, Vec<Monitor>, Vec<Logical>, HashMap<String, OwnedValue>);
+type LogicalEntry<'a> = (i32, i32, f64, u32, bool, Vec<(String, String, HashMap<&'a str, Value<'a>>)>);
+
+#[zbus::proxy(
+    interface = "org.gnome.Mutter.DisplayConfig",
+    default_service = "org.gnome.Mutter.DisplayConfig",
+    default_path = "/org/gnome/Mutter/DisplayConfig"
+)]
+trait DisplayConfig {
+    fn get_current_state(&self) -> zbus::Result<State>;
+    fn apply_monitors_config(
+        &self,
+        serial: u32,
+        method: u32,
+        logical_monitors: Vec<LogicalEntry<'_>>,
+        properties: HashMap<&str, Value<'_>>,
+    ) -> zbus::Result<()>;
+}
+
+/// `ApplyMonitorsConfig` method: apply without saving or asking.
+const METHOD_TEMPORARY: u32 = 1;
+/// `layout-mode` 2: positions in logical pixels (Wayland's default).
+const LAYOUT_LOGICAL: u32 = 2;
+
+struct Layout {
+    serial: u32,
+    monitors: Vec<MonitorInfo>,
+    logical: Vec<LogicalMonitor>,
+    logical_layout: bool,
+}
+
+async fn layout(proxy: &DisplayConfigProxy<'_>) -> zbus::Result<Layout> {
+    let (serial, monitors, logical, properties) = proxy.get_current_state().await?;
+    let monitors = monitors
+        .into_iter()
+        .map(|(spec, modes, _)| {
+            let current =
+                modes.iter().find(|m| m.6.get("is-current").and_then(|v| bool::try_from(v).ok()).unwrap_or(false));
+            MonitorInfo {
+                connector: spec.0,
+                current_mode: current.map(|m| (m.0.clone(), m.1, m.2)),
+                scales: current.map(|m| m.5.clone()).unwrap_or_default(),
+            }
+        })
+        .collect();
+    let logical = logical
+        .into_iter()
+        .map(|(x, y, scale, transform, primary, specs, _)| LogicalMonitor {
+            x,
+            y,
+            scale,
+            transform,
+            primary,
+            connectors: specs.into_iter().map(|s| s.0).collect(),
+        })
+        .collect();
+    let mode = properties.get("layout-mode").and_then(|v| u32::try_from(v).ok());
+    Ok(Layout { serial, monitors, logical, logical_layout: mode == Some(LAYOUT_LOGICAL) })
+}
+
+/// The connectors present now (to recognise the monitor a stream adds).
+pub async fn connectors(connection: &zbus::Connection) -> Vec<String> {
+    let Ok(proxy) = DisplayConfigProxy::new(connection).await else { return Vec::new() };
+    layout(&proxy).await.map(|l| l.monitors.into_iter().map(|m| m.connector).collect()).unwrap_or_default()
+}
+
+/// Sets the scale of the monitor that appeared since `before` at `size` pixels.
+pub async fn scale_new_monitor(
+    connection: &zbus::Connection,
+    before: &[String],
+    size: (u32, u32),
+    scale: f64,
+) -> Result<String, String> {
+    let proxy = DisplayConfigProxy::new(connection).await.map_err(|e| e.to_string())?;
+    let layout = layout(&proxy).await.map_err(|e| format!("DisplayConfig: {e}"))?;
+    if !layout.logical_layout {
+        return Err("the desktop uses physical layout mode".into());
+    }
+    let monitor = monitors::find_new_monitor(before, &layout.monitors, size)
+        .ok_or("the virtual monitor is not in DisplayConfig")?
+        .connector
+        .clone();
+    let configs = monitors::with_scale(&layout.logical, &layout.monitors, &monitor, scale)?;
+    let entries: Vec<LogicalEntry<'_>> = configs
+        .into_iter()
+        .map(|LogicalConfig { x, y, scale, transform, primary, monitors }| {
+            let monitors = monitors.into_iter().map(|(c, mode)| (c, mode, HashMap::new())).collect();
+            (x, y, scale, transform, primary, monitors)
+        })
+        .collect();
+    proxy
+        .apply_monitors_config(layout.serial, METHOD_TEMPORARY, entries, HashMap::new())
+        .await
+        .map_err(|e| format!("ApplyMonitorsConfig: {e}"))?;
+    Ok(monitor)
+}
