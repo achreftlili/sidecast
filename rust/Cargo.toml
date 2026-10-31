@@ -1,0 +1,48 @@
+[workspace]
+resolver = "3"
+members = ["sidecast-core"]
+
+[workspace.package]
+version = "0.6.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+repository = "https://github.com/achreftlili/sidecast"
+publish = false
+
+[workspace.dependencies]
+sidecast-core = { path = "sidecast-core" }
+sidecast-server = { path = "sidecast-server", default-features = false }
+
+base64 = "0.23"
+getrandom = "0.4"
+gethostname = "1"
+hmac = "0.13"
+if-addrs = "0.15"
+log = "0.4"
+mdns-sd = { version = "0.21", default-features = false, features = ["logging"] }
+# Software H.264 (BSD-2-Clause, compiled from Cisco's OpenH264 source; see THIRD_PARTY_NOTICES.md).
+openh264 = { version = "0.9", default-features = false, features = ["source"] }
+# Same crate version as openh264 uses; only for the live-bitrate option constants.
+openh264-sys2 = { version = "0.9", default-features = false }
+# Self-signed P-256 certificate; the `ring` backend keeps Windows builds free of aws-lc's CMake/NASM needs.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+subtle = "2.6"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+unicode-segmentation = "1.12"
+
+[workspace.lints.rust]
+# Platform backends that need FFI opt in locally with `#[allow(unsafe_code)]`.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.release]
+debug = "line-tables-only"
