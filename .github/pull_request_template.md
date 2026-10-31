@@ -9,5 +9,5 @@
 ## Checklist
 
 - [ ] `make test` passes
-- [ ] Wire-protocol changes update `docs/PROTOCOL.md` (including the §8 test vectors) and both the Mac and Android codecs and tests
+- [ ] Wire-protocol changes update `docs/PROTOCOL.md` (including the §8 test vectors) and the Mac, Android and Rust codecs and tests
 - [ ] Design decisions are recorded in `docs/DECISIONS.md`

@@ -155,12 +155,15 @@ make test
 
 Runs the Mac (XCTest) and Android (JUnit) unit tests, including the shared protocol test vectors and the iOS client's logic (in SidecastKit). `make test-ios` adds the iOS app's own tests on a simulator. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+The Windows and Linux host is being built in Rust ([rust/README.md](rust/README.md)): a shared core, the host server and a conformance probe. `make test-rust` runs its tests and `make conformance` checks every probe against every host (the Rust host, and on macOS the Mac app) in test-pattern mode.
+
 ```
 mac/       Swift package: SidecastKit (tested logic, incl. the iOS client's), Sidecast (app), SidecastProbe (CLI test client), mic driver
 android/   Gradle project: protocol/ net/ video/ input/ audio/ store/ ui/
 ios/       iPhone / iPad app (UIKit) on SidecastKit; Sidecast.xcodeproj is generated from project.yml (XcodeGen)
+rust/      Cargo workspace: sidecast-core, sidecast-server, sidecast-host (Windows/Linux, test pattern for now), sidecast-probe
 docs/      DECISIONS.md, PROTOCOL.md, ROADMAP.md
-scripts/   doctor.sh
+scripts/   doctor.sh, conformance.sh
 dist/      build outputs (gitignored)
 ```
 

@@ -13,15 +13,15 @@ Any phone or tablet becomes a **second screen, touchpad, keyboard and microphone
 | | Android client | iOS / iPadOS client |
 |---|---|---|
 | **macOS host** | ✅ Works (0.6) | 🧪 Preview (P4): built from source, tested in the iOS Simulator |
-| **Windows host** | Planned (P2) | Planned |
-| **Linux host** | Planned (P3) | Planned |
+| **Windows host** | Planned (P2); shared Rust core and test-pattern host ready | Planned |
+| **Linux host** | Planned (P3); shared Rust core and test-pattern host ready | Planned |
 
 ## Phases
 
 | Phase | Content |
 |---|---|
 | **P0: Open-source launch** ✅ | Apache 2.0, build-from-source installs (`make doctor`, `make install-mac`, `make install-android`), a per-user local signing certificate for macOS, CI, security policy. |
-| **P1: Open protocol** | Protocol v2, backward compatible: hosts announce their OS and capabilities; semantic actions (`desktop.next`, `overview`, `copy`, `paste`…) that each host maps to its own shortcuts. A conformance tool, grown from `sidecast-probe`, that every host must pass. A shared Rust core (`sidecast-core`: protocol, pairing, flow control, gestures) for the new hosts. |
+| **P1: Open protocol** (in progress) | Protocol v2, backward compatible: hosts announce their OS and capabilities; semantic actions (`desktop.next`, `overview`, `copy`, `paste`…) that each host maps to its own shortcuts. A conformance tool, grown from `sidecast-probe`, that every host must pass. A shared Rust core (`sidecast-core`: protocol, pairing, flow control, gestures) for the new hosts. **Done:** hosts announce their OS (Q34); the Rust workspace `rust/` (Q36) with `sidecast-core`, the host server with backend traits, a test-pattern host and the Rust conformance probe, checked against the Mac app and the Swift probe by `make conformance` in CI; the gesture engine already emits semantic actions inside the host. **Next:** capabilities and semantic actions on the wire (protocol v2). |
 | **P2: Windows host** | Rust + Tauri tray app. Virtual monitor through the signed, MIT-licensed [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (Windows only loads Microsoft-signed drivers, so users install that driver's official build). Capture with Windows.Graphics.Capture, hardware encoding (NVENC / AMF / Quick Sync / Media Foundation), input with SendInput and InjectTouchInput, keep-awake with SetThreadExecutionState. Phone mic through an existing virtual audio cable at first. Installed with `install.ps1`. |
 | **P3: Linux host** | Ubuntu GNOME on Wayland first: virtual monitor and capture through Mutter's ScreenCast (`RecordVirtual`) and PipeWire, input through the RemoteDesktop portal (libei), keep-awake through a logind inhibitor, phone mic as a PipeWire virtual source, hardware encoding through VA-API / NVENC. Then KDE, wlroots and X11. |
 | **P4: iOS / iPadOS client** 🧪 | Preview in `ios/` (`make install-ios`): the client logic lives in `SidecastKit` and is unit-tested on macOS; the app is UIKit. Swift app reusing `SidecastKit`: VideoToolbox decoding, Network.framework TLS with pinning, Bonjour, touch, Apple Pencil, keyboard and dictation, microphone. Built from Xcode with a free Apple ID; the app then has to be reinstalled every 7 days (a paid Apple developer account removes that limit). |
