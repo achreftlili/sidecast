@@ -100,6 +100,11 @@ class DisplaySession(
 
     val counters = RxCounters()
 
+    /** The host's OS (a `HostPlatform` value) from SERVER_HELLO; null until first authenticated. */
+    @Volatile
+    var platform: String? = null
+        private set
+
     @Volatile
     private var client: StreamClient? = null
 
@@ -334,6 +339,7 @@ class DisplaySession(
             retryCause = null
             everStreamed = true
             expectedServerId = server.serverId
+            platform = server.platform
             if (server.serverName.isNotBlank()) macName = server.serverName
             _state.value = SessionState.Streaming(macName)
         }

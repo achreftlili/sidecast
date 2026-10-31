@@ -1,6 +1,8 @@
 package com.achreftlili.sidecast.ui
 
+import com.achreftlili.sidecast.R
 import com.achreftlili.sidecast.net.DiscoveredMac
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.ServerAddress
 import com.achreftlili.sidecast.store.PairedMac
 import org.junit.Assert.assertEquals
@@ -54,6 +56,38 @@ class MacListTest {
         val home = MacList.merge(listOf(DiscoveredMac("Studio", "id-1", "1", "192.168.1.20", 47800)), listOf(withTailscale))
         assertFalse(home.single().remote)
         assertTrue(home.single().online)
+    }
+
+    @Test
+    fun platformComesFromTxtWhenDiscoveredElseFromThePairing() {
+        val items = MacList.merge(
+            discovered = listOf(
+                DiscoveredMac("Gaming PC", "id-1", "1", "192.168.1.40", 47800, platform = HostPlatform.WINDOWS),
+                DiscoveredMac("Old Mac", "id-2", "1", "192.168.1.41", 47800), // no TXT os
+                DiscoveredMac("Future", "id-3", "1", "192.168.1.42", 47800, platform = "haiku"),
+            ),
+            paired = listOf(
+                paired("id-1", "Gaming PC").copy(platform = HostPlatform.MACOS), // the live TXT record wins
+                paired("id-4", "Workstation").copy(platform = HostPlatform.LINUX),
+                paired("id-5", "Office Mac"), // stored before platforms existed
+            ),
+        ).associateBy { it.serverId }
+        assertEquals(HostPlatform.WINDOWS, items.getValue("id-1").platform)
+        assertEquals(HostPlatform.MACOS, items.getValue("id-2").platform)
+        assertEquals("haiku", items.getValue("id-3").platform)
+        assertEquals(HostPlatform.LINUX, items.getValue("id-4").platform)
+        assertEquals(HostPlatform.MACOS, items.getValue("id-5").platform)
+    }
+
+    @Test
+    fun platformLabels() {
+        assertEquals(R.string.platform_macos, PlatformLabel.of(HostPlatform.MACOS))
+        assertEquals(R.string.platform_windows, PlatformLabel.of(HostPlatform.WINDOWS))
+        assertEquals(R.string.platform_linux, PlatformLabel.of(HostPlatform.LINUX))
+        // Unknown: no label, a generic computer.
+        assertNull(PlatformLabel.of("haiku"))
+        assertNull(PlatformLabel.of(""))
+        assertNull(PlatformLabel.of(null))
     }
 
     @Test

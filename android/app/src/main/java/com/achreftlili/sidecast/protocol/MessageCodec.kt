@@ -95,6 +95,7 @@ object MessageCodec {
                 for (address in list) a.put(JSONObject().put("host", address.host).put("kind", address.kind))
                 put("addresses", a)
             }
+            put("platform", message.platform)
         }
         is PairChallenge -> json {
             put("expiresInSec", message.expiresInSec)
@@ -276,6 +277,8 @@ object MessageCodec {
                 // Optional and tolerant: a bad port or entry is skipped, never fatal.
                 port = (opt("port") as? Number)?.toInt()?.takeIf { it in 1..65535 },
                 addresses = optJSONArray("addresses")?.let(::decodeAddresses),
+                // Mac hosts older than this field omit it.
+                platform = opt("platform") as? String ?: HostPlatform.MACOS,
             )
         }
         MessageType.PAIR_CHALLENGE -> payload.json().run {

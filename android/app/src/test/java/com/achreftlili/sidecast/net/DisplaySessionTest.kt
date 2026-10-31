@@ -7,6 +7,7 @@ import com.achreftlili.sidecast.protocol.Bye
 import com.achreftlili.sidecast.protocol.Audio
 import com.achreftlili.sidecast.protocol.Cursor
 import com.achreftlili.sidecast.protocol.Hello
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.InputMode
 import com.achreftlili.sidecast.protocol.InputModeName
 import com.achreftlili.sidecast.protocol.MicControl
@@ -99,6 +100,19 @@ class DisplaySessionTest {
         assertEquals(listOf(StreamConfig("h264", 1920, 1080, 60)), configs.toList())
         assertEquals(fingerprint.toHex(), pins.first())
         assertEquals(1L, session.counters.videoFrames.get())
+    }
+
+    @Test
+    fun knowsTheHostPlatformOnceAuthenticated() {
+        assertNull(session.platform)
+        session.start()
+        val peer = mac.accept()
+        peer.expect<Hello>()
+        peer.send(ServerHello(Protocol.VERSION, serverId, "Session Mac", platform = HostPlatform.WINDOWS))
+        peer.expect<Auth>()
+        peer.send(AuthResult(ok = true))
+        awaitState("streaming") { it is SessionState.Streaming }
+        assertEquals(HostPlatform.WINDOWS, session.platform)
     }
 
     @Test

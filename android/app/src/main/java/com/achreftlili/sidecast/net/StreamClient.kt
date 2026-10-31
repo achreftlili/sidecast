@@ -10,6 +10,7 @@ import com.achreftlili.sidecast.protocol.Cursor
 import com.achreftlili.sidecast.protocol.FrameAck
 import com.achreftlili.sidecast.protocol.FrameReader
 import com.achreftlili.sidecast.protocol.Hello
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.InputMode
 import com.achreftlili.sidecast.protocol.InputModeName
 import com.achreftlili.sidecast.protocol.Key
@@ -95,7 +96,13 @@ class StreamClient(
         val wrongCode: Boolean,
     )
 
-    data class ServerIdentity(val serverId: String, val serverName: String, val newlyPaired: Boolean)
+    /** [platform]: the host's OS, a [HostPlatform] (§4). */
+    data class ServerIdentity(
+        val serverId: String,
+        val serverName: String,
+        val newlyPaired: Boolean,
+        val platform: String = HostPlatform.MACOS,
+    )
 
     sealed interface EndReason {
         /** [close] was called. */
@@ -280,7 +287,7 @@ class StreamClient(
         val reader = FrameReader(conn.input)
         try {
             while (!ended.get()) {
-                val frame = reader.next() ?: throw EOFException("the Mac closed the connection")
+                val frame = reader.next() ?: throw EOFException("the computer closed the connection")
                 val receivedAt = System.nanoTime()
                 val message = MessageCodec.decode(frame) ?: continue
                 handle(message, conn, receivedAt, frame.payload.size)
@@ -379,8 +386,9 @@ class StreamClient(
                         reached.port,
                         addresses = hello.addresses,
                         serverPort = hello.port,
+                        platform = hello.platform,
                     )
-                    becomeStreaming(ServerIdentity(hello.serverId, hello.serverName, newlyPaired = false))
+                    becomeStreaming(ServerIdentity(hello.serverId, hello.serverName, newlyPaired = false, platform = hello.platform))
                 } else {
                     val reason = msg.reason ?: Reason.UNKNOWN_DEVICE
                     // §5 AUTH: forget the stale pairing; the next attempt pairs again.
@@ -402,9 +410,10 @@ class StreamClient(
                             lastPort = reached.port,
                             addresses = hello.addresses ?: emptyList(),
                             serverPort = hello.port ?: 0,
+                            platform = hello.platform,
                         ),
                     )
-                    becomeStreaming(ServerIdentity(hello.serverId, hello.serverName, newlyPaired = true))
+                    becomeStreaming(ServerIdentity(hello.serverId, hello.serverName, newlyPaired = true, platform = hello.platform))
                 } else {
                     val attemptsLeft = msg.attemptsLeft ?: 0
                     when {
@@ -508,7 +517,7 @@ class StreamClient(
                 }
             }
             State.AWAIT_SERVER_HELLO, State.AWAIT_CHALLENGE, State.AWAIT_PAIR_RESULT, State.AWAIT_AUTH_RESULT -> {
-                if (now > responseDeadlineNanos) end(EndReason.ConnectFailed("the Mac did not answer"))
+                if (now > responseDeadlineNanos) end(EndReason.ConnectFailed("the computer did not answer"))
             }
             else -> Unit
         }

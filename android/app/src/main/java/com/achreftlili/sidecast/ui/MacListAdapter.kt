@@ -26,7 +26,7 @@ class MacListAdapter(
         fun bind(item: MacListItem) {
             val context = binding.root.context
             binding.name.text = item.name
-            binding.status.text = when {
+            val status = when {
                 item.online && !item.compatible ->
                     context.getString(R.string.mac_status_online_version, item.protocolVersion)
                 item.online -> context.getString(R.string.mac_status_online, item.host)
@@ -34,6 +34,10 @@ class MacListAdapter(
                 item.host != null -> context.getString(R.string.mac_status_offline, item.host)
                 else -> context.getString(R.string.mac_status_offline_unknown)
             }
+            // An OS this version does not know shows no label, like a generic computer.
+            binding.status.text = PlatformLabel.of(item.platform)?.let {
+                context.getString(R.string.mac_status_with_platform, context.getString(it), status)
+            } ?: status
             val dotColor = if (item.online) {
                 ContextCompat.getColor(context, R.color.status_online)
             } else {

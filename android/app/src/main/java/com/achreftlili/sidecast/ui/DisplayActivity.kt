@@ -116,7 +116,7 @@ class DisplayActivity : AppCompatActivity(), OverlayActions {
         setContentView(binding.root)
         hideSystemBars()
 
-        presenter = OverlayPresenter(this, target.name, this)
+        presenter = OverlayPresenter(this, target.name, this) { viewModel.session?.platform }
         viewModel.start(target, ScreenMetrics.landscape(this))
         val session = checkNotNull(viewModel.session)
         val pipeline = checkNotNull(viewModel.pipeline)

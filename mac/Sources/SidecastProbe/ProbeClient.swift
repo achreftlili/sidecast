@@ -141,7 +141,8 @@ final class ProbeClient {
         guard phase == .hello else { return fail("unexpected SERVER_HELLO") }
         guard hello.protocol == SidecastProtocol.version else { return fail("server protocol \(hello.protocol)") }
         serverHello = hello
-        print("probe: SERVER_HELLO \(hello.serverName) serverId \(hello.serverId) port \(hello.port.map(String.init) ?? "-")")
+        print("probe: SERVER_HELLO \(hello.serverName) serverId \(hello.serverId) port \(hello.port.map(String.init) ?? "-")"
+              + " platform \(hello.platform)\(hello.hostPlatform == nil ? " (unknown)" : "")")
         for address in hello.addresses ?? [] {
             print("probe:   address \(address.host) (\(address.kind))")
         }
@@ -149,7 +150,7 @@ final class ProbeClient {
         phase = .authenticating
         if let pairing = state.servers[hello.serverId] {
             guard pairing.fingerprint == fingerprint?.hexString else {
-                return fail("This Mac's identity changed — pair again (pinned \(pairing.fingerprint))")
+                return fail("This computer's identity changed — pair again (pinned \(pairing.fingerprint))")
             }
             guard let token = Data(base64Encoded: pairing.token) else { return fail("corrupt token in state") }
             print("probe: pinned fingerprint matches; sending AUTH")
@@ -158,7 +159,7 @@ final class ProbeClient {
             print("probe: not paired yet; sending PAIR_START")
             send(.pairStart)
         } else {
-            fail("not paired with this Mac and no --code given")
+            fail("not paired with this computer and no --code given")
         }
     }
 

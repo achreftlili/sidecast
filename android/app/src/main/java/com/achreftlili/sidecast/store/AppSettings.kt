@@ -9,7 +9,7 @@ import com.achreftlili.sidecast.protocol.InputModeName
 class AppSettings(private val prefs: SharedPreferences) {
     constructor(context: Context) : this(context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE))
 
-    /** "Use phone as Mac microphone" (§7.2). When off, the Mac's requests are answered `disabled`. */
+    /** "Use phone as microphone" (§7.2). When off, the computer's requests are answered `disabled`. */
     var micEnabled: Boolean
         get() = prefs.getBoolean(KEY_MIC_ENABLED, true)
         set(value) = prefs.edit { putBoolean(KEY_MIC_ENABLED, value) }

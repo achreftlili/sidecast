@@ -10,6 +10,7 @@ import com.achreftlili.sidecast.protocol.MessageType
 import com.achreftlili.sidecast.protocol.Bye
 import com.achreftlili.sidecast.protocol.FrameAck
 import com.achreftlili.sidecast.protocol.Hello
+import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.InputMode
 import com.achreftlili.sidecast.protocol.InputModeName
 import com.achreftlili.sidecast.protocol.Key
@@ -582,6 +583,38 @@ class StreamClientTest {
         assertEquals(addresses, stored.addresses)
         assertEquals(0, stored.serverPort)
         assertEquals("127.0.0.1", stored.lastHost) // no endpoint from the connector: the client's own
+    }
+
+    @Test
+    fun newPairingStoresTheHostPlatform() {
+        val c = startClient()
+        val peer = mac.accept()
+        peer.expect<Hello>()
+        peer.send(ServerHello(Protocol.VERSION, serverId, "Gaming PC", platform = HostPlatform.WINDOWS))
+        peer.expect<PairStart>()
+        peer.send(PairChallenge(expiresInSec = 120, attemptsLeft = 5))
+        listener.await<StreamClient.PairingPrompt>()
+        assertTrue(c.submitPairingCode("123456"))
+        peer.expect<PairProof>()
+        peer.send(AuthResult(ok = true, token = token))
+        assertEquals(
+            StreamClient.ServerIdentity(serverId, "Gaming PC", newlyPaired = true, platform = HostPlatform.WINDOWS),
+            listener.await<StreamClient.ServerIdentity>(),
+        )
+        assertEquals(HostPlatform.WINDOWS, pairings.get(serverId)!!.platform)
+    }
+
+    @Test
+    fun authenticationUpdatesTheStoredPlatform() {
+        storePairing() // stored as a Mac, like every pairing made before hosts announced their OS
+        startClient()
+        val peer = mac.accept()
+        peer.expect<Hello>()
+        peer.send(ServerHello(Protocol.VERSION, serverId, "Test Mac", platform = HostPlatform.LINUX))
+        peer.expect<Auth>()
+        peer.send(AuthResult(ok = true))
+        assertEquals(HostPlatform.LINUX, listener.await<StreamClient.ServerIdentity>().platform)
+        assertEquals(HostPlatform.LINUX, pairings.get(serverId)!!.platform)
     }
 
     @Test

@@ -127,7 +127,7 @@ Runs the real server/encoder/TLS/flow-control path with a synthetic test pattern
 - **Phone doesn't list the Mac**: some routers block Bonjour (guest/hotel/office networks). Use **Add by IP address**; the Mac's IP is in System Settings → Wi-Fi → Details.
 - **Permissions asked again after updating**: run `make mac-signing` once, then `make install-mac`, and grant them one last time.
 - **`make install-android` says the signatures don't match**: the phone has a Sidecast built on another computer. Uninstall it (`adb uninstall com.achreftlili.sidecast`, which forgets its pairings) and run it again.
-- **"This Mac's identity changed"**: the Mac's certificate was regenerated (e.g. its data folder was deleted). Forget it on the phone (long-press) and pair again.
+- **"This computer's identity changed"**: the Mac's certificate was regenerated (e.g. its data folder was deleted). Forget it on the phone (long-press) and pair again.
 - **Black / laggy picture**: lower the max bitrate or fps in Settings…; prefer 5 GHz Wi-Fi.
 
 ## Development

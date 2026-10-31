@@ -39,6 +39,9 @@ class MessageCodecTest {
                 addresses = listOf(ServerAddress("192.168.1.20", AddressKind.LAN), ServerAddress("100.101.102.103", AddressKind.TAILSCALE)),
             ),
             ServerHello(1, "srv", "Studio", addresses = emptyList()),
+            ServerHello(1, "srv", "Gaming PC", port = 47800, platform = HostPlatform.WINDOWS),
+            ServerHello(1, "srv", "Workstation", platform = HostPlatform.LINUX),
+            ServerHello(1, "srv", "Future", platform = "plan9"),
             hello.copy(network = NetworkKind.METERED, limits = StreamLimits(4000, 30)),
             hello.copy(network = NetworkKind.UNMETERED),
             PairChallenge(expiresInSec = 120, attemptsLeft = 5),
@@ -118,6 +121,25 @@ class MessageCodecTest {
             messy.addresses,
         )
         assertNull(decode("""{"protocol":1,"serverId":"s","addresses":"nope","port":"x"}""").addresses)
+    }
+
+    @Test
+    fun serverHelloPlatformDefaultsToMacosAndKeepsUnknownValues() {
+        fun platform(extra: String): String {
+            val payload = """{"protocol":1,"serverId":"s","serverName":"n"$extra}"""
+            return (MessageCodec.decode(MessageType.SERVER_HELLO, payload.toByteArray()) as ServerHello).platform
+        }
+        assertEquals(HostPlatform.MACOS, platform("")) // Mac hosts before the field
+        assertEquals(HostPlatform.WINDOWS, platform(""","platform":"windows""""))
+        assertEquals(HostPlatform.LINUX, platform(""","platform":"linux""""))
+        assertEquals("beos", platform(""","platform":"beos"""")) // kept: the UI shows a generic computer
+        // Malformed is ignored, never fatal.
+        assertEquals(HostPlatform.MACOS, platform(""","platform":null"""))
+        assertEquals(HostPlatform.MACOS, platform(""","platform":42"""))
+
+        // Always written.
+        assertEquals("macos", json(ServerHello(1, "s", "n")).getString("platform"))
+        assertEquals("windows", json(ServerHello(1, "s", "n", platform = HostPlatform.WINDOWS)).getString("platform"))
     }
 
     @Test

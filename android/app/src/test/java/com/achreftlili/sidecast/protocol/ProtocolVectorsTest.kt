@@ -110,4 +110,17 @@ class ProtocolVectorsTest {
     fun pingVector() {
         assertArrayEquals(hex("13 00 00 00 08 00 00 00 00 00 00 00 01"), MessageCodec.encode(Ping(1)))
     }
+
+    // 8.4 SERVER_HELLO platform
+    @Test
+    fun serverHelloPlatformVectors() {
+        fun platform(json: String) = (MessageCodec.decode(MessageType.SERVER_HELLO, json.toByteArray()) as ServerHello).platform
+        val known = setOf(HostPlatform.MACOS, HostPlatform.WINDOWS, HostPlatform.LINUX)
+        assertEquals(HostPlatform.MACOS, platform("""{"protocol":1,"serverId":"S","serverName":"Studio","platform":"macos"}"""))
+        assertEquals(HostPlatform.WINDOWS, platform("""{"protocol":1,"serverId":"S","serverName":"Studio","platform":"windows"}"""))
+        assertEquals(HostPlatform.LINUX, platform("""{"protocol":1,"serverId":"S","serverName":"Studio","platform":"linux"}"""))
+        assertEquals(HostPlatform.MACOS, platform("""{"protocol":1,"serverId":"S","serverName":"Studio"}"""))
+        val unknown = platform("""{"protocol":1,"serverId":"S","serverName":"Studio","platform":"beos"}""")
+        assertTrue(unknown !in known) // shown as a generic computer
+    }
 }

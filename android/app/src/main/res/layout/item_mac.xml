@@ -61,7 +61,7 @@
                     android:maxLines="1"
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    tools:text="Online · 192.168.1.20" />
+                    tools:text="macOS · Online · 192.168.1.20" />
             </LinearLayout>
         </LinearLayout>
 
