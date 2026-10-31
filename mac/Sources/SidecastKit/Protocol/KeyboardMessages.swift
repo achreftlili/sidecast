@@ -19,6 +19,45 @@ public enum TextMessage {
         guard text.utf8.elementsEqual(payload) else { throw ProtocolError.malformed(.text, "invalid UTF-8") }
         return text
     }
+
+    /// Splits `text` into TEXT payloads of at most `maxBytes` UTF-8 bytes, cut only
+    /// between grapheme clusters (a single larger cluster is cut between Unicode
+    /// scalars as a last resort). Empty text gives no chunks.
+    public static func split(_ text: String, maxBytes: Int = maxBytes) -> [String] {
+        let limit = max(4, maxBytes)   // one scalar is at most 4 bytes
+        guard text.utf8.count > limit else { return text.isEmpty ? [] : [text] }
+        var out: [String] = []
+        var current = ""
+        var currentBytes = 0
+        for character in text {
+            let bytes = character.utf8.count
+            if bytes > limit {
+                if !current.isEmpty { out.append(current) }
+                current = ""
+                currentBytes = 0
+                for scalar in character.unicodeScalars {
+                    let width = String(scalar).utf8.count
+                    if currentBytes + width > limit {
+                        out.append(current)
+                        current = ""
+                        currentBytes = 0
+                    }
+                    current.unicodeScalars.append(scalar)
+                    currentBytes += width
+                }
+                continue
+            }
+            if currentBytes + bytes > limit {
+                out.append(current)
+                current = ""
+                currentBytes = 0
+            }
+            current.append(character)
+            currentBytes += bytes
+        }
+        if !current.isEmpty { out.append(current) }
+        return out
+    }
 }
 
 /// The `key` byte of KEY (PROTOCOL §7.1).
