@@ -6,6 +6,8 @@ mac/.swiftpm/
 *.xcuserstate
 xcuserdata/
 DerivedData/
+# iOS: per-user signing (team + bundle id), see ios/Local.xcconfig.example
+ios/Local.xcconfig
 # Android / Gradle
 android/.gradle/
 android/build/

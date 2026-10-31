@@ -1,22 +1,29 @@
-// Draws the Sidecast app icon into an .iconset directory (for `iconutil`).
+// Draws the Sidecast app icon into an .iconset directory (for `iconutil`), or
+// the single 1024 px PNG of the iOS app.
 // Usage: make-icon <output.iconset>
+//        make-icon --ios <output.png>
 // A display with a landscape phone in front of it, on an indigo→teal tile.
 
 import AppKit
 
-func drawIcon(in ctx: CGContext, size: CGFloat) {
+/// `fullBleed`: the tile fills the square (iOS masks the corners itself) and the
+/// drawing keeps its size, so the corner mask never clips it.
+func drawIcon(in ctx: CGContext, size: CGFloat, fullBleed: Bool = false) {
     ctx.saveGState()
     ctx.scaleBy(x: size / 1024, y: size / 1024)
 
     // Tile (macOS icon grid: 824 pt body, centred).
-    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
-    let tilePath = CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil)
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: NSColor.black.withAlphaComponent(0.35).cgColor)
-    ctx.addPath(tilePath)
-    ctx.setFillColor(NSColor.black.cgColor)
-    ctx.fillPath()
-    ctx.restoreGState()
+    let tile = fullBleed ? CGRect(x: 0, y: 0, width: 1024, height: 1024) : CGRect(x: 100, y: 100, width: 824, height: 824)
+    let tilePath = fullBleed ? CGPath(rect: tile, transform: nil)
+        : CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil)
+    if !fullBleed {
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: NSColor.black.withAlphaComponent(0.35).cgColor)
+        ctx.addPath(tilePath)
+        ctx.setFillColor(NSColor.black.cgColor)
+        ctx.fillPath()
+        ctx.restoreGState()
+    }
 
     ctx.saveGState()
     ctx.addPath(tilePath)
@@ -24,7 +31,8 @@ func drawIcon(in ctx: CGContext, size: CGFloat) {
     let colors = [NSColor(red: 0.20, green: 0.22, blue: 0.62, alpha: 1).cgColor,
                   NSColor(red: 0.07, green: 0.62, blue: 0.70, alpha: 1).cgColor] as CFArray
     let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
-    ctx.drawLinearGradient(gradient, start: CGPoint(x: 100, y: 924), end: CGPoint(x: 924, y: 100), options: [])
+    ctx.drawLinearGradient(gradient, start: CGPoint(x: tile.minX, y: tile.maxY), end: CGPoint(x: tile.maxX, y: tile.minY),
+                           options: [])
     ctx.restoreGState()
 
     let white = NSColor.white.cgColor
@@ -66,7 +74,7 @@ func drawIcon(in ctx: CGContext, size: CGFloat) {
     ctx.restoreGState()
 }
 
-func writePNG(pixels: Int, to url: URL) throws {
+func writePNG(pixels: Int, to url: URL, fullBleed: Bool = false) throws {
     guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
                                      bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                      colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
@@ -77,15 +85,19 @@ func writePNG(pixels: Int, to url: URL) throws {
     NSGraphicsContext.current = gc
     gc.cgContext.clear(CGRect(x: 0, y: 0, width: pixels, height: pixels))
     gc.cgContext.interpolationQuality = .high
-    drawIcon(in: gc.cgContext, size: CGFloat(pixels))
+    drawIcon(in: gc.cgContext, size: CGFloat(pixels), fullBleed: fullBleed)
     NSGraphicsContext.restoreGraphicsState()
     guard let png = rep.representation(using: .png, properties: [:]) else { throw NSError(domain: "make-icon", code: 2) }
     try png.write(to: url)
 }
 
 let args = CommandLine.arguments
+if args.count == 3, args[1] == "--ios" {
+    try writePNG(pixels: 1024, to: URL(fileURLWithPath: args[2]), fullBleed: true)
+    exit(0)
+}
 guard args.count == 2 else {
-    FileHandle.standardError.write(Data("usage: make-icon <output.iconset>\n".utf8))
+    FileHandle.standardError.write(Data("usage: make-icon <output.iconset> | make-icon --ios <output.png>\n".utf8))
     exit(2)
 }
 let out = URL(fileURLWithPath: args[1], isDirectory: true)

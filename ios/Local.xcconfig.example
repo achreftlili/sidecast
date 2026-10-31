@@ -1,0 +1,12 @@
+// Copy to ios/Local.xcconfig (gitignored), fill in both values, then run
+// `make install-ios` with the iPhone or iPad connected.
+
+// Your Apple team ID. Sign in to Xcode with your Apple ID first (Xcode →
+// Settings → Accounts; a free Apple ID works and shows "Personal Team"). The ID
+// is the 10 characters in parentheses of your "Apple Development" certificate
+// (Keychain Access), or under Membership in your developer account.
+DEVELOPMENT_TEAM = ABCDE12345
+
+// A bundle identifier nobody else uses: Apple refuses one already registered by
+// another team. Reverse DNS of something you own, or your name, works.
+SIDECAST_BUNDLE_ID = com.yourname.sidecast
