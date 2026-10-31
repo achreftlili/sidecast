@@ -21,6 +21,7 @@ use sidecast_server::backend::{
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 
 use super::capture::{CaptureConfig, PipeWireCapture, SharedCursor};
+use super::display_config;
 use super::keymap::TextInput;
 use super::remote_input::{RemoteApi, RemoteInputSink};
 use super::translate::{RemoteCall, Translator};
@@ -218,6 +219,7 @@ impl DisplayBackend for MutterBackend {
         frames: FrameSink,
     ) -> Result<Box<dyn CaptureSession>, BackendError> {
         let size = (plan.display.pixel_width() as u32, plan.display.pixel_height() as u32);
+        let monitors_before = zbus::block_on(display_config::connectors(&self.connection));
         let session = zbus::block_on(MutterSession::start(&self.connection)).map_err(BackendError::display_failed)?;
         let cursor = Arc::new(SharedCursor::default());
         let config = CaptureConfig {
@@ -237,6 +239,14 @@ impl DisplayBackend for MutterBackend {
         };
         if capture.size != size {
             log::warn!("mutter: asked for a {}x{} monitor, got {}x{}", size.0, size.1, capture.size.0, capture.size.1);
+        }
+        // HiDPI: 200 %, so the desktop on the phone has the size of the plan's points
+        // (Mutter picks 100 % for a monitor without a physical size).
+        let scale = if plan.display.hi_dpi { 2.0 } else { 1.0 };
+        match zbus::block_on(display_config::scale_new_monitor(&self.connection, &monitors_before, capture.size, scale))
+        {
+            Ok(connector) => log::info!("mutter: virtual monitor {connector} at {:.0} %", scale * 100.0),
+            Err(error) => log::warn!("mutter: cannot set the virtual monitor's scale: {error}"),
         }
         log::info!(
             "mutter: virtual monitor {}x{} px for {}{} (stream {}, PipeWire node {})",

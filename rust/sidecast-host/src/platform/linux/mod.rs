@@ -16,11 +16,14 @@
 mod desktop;
 mod keymap;
 mod menu;
+mod monitors;
 mod pixels;
 mod translate;
 
 #[cfg(target_os = "linux")]
 mod capture;
+#[cfg(target_os = "linux")]
+mod display_config;
 #[cfg(all(target_os = "linux", feature = "gstreamer"))]
 mod gst_encoder;
 #[cfg(target_os = "linux")]

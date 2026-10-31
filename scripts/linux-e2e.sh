@@ -106,9 +106,9 @@ if ! wait_for 20 grep -q "listening on port" "$WORK/host.log"; then
 fi
 grep -E "linux: |encoder" "$WORK/host.log" | sed 's/^/    /'
 if ((HAVE_DESKTOP == 0)); then
-    # Fallback: copy the code from the log line "PAIRING: enter 123456 on …".
+    # Fallback: copy the code from the log line "PAIRING: enter 123 456 on …".
     ( while ! grep -q "PAIRING: enter" "$WORK/host.log"; do sleep 0.2; done
-      grep -o "PAIRING: enter [0-9]\{6\}" "$WORK/host.log" | head -1 | grep -o "[0-9]\{6\}" >"$CODE_FILE" ) &
+      grep -o "PAIRING: enter [0-9 ]*" "$WORK/host.log" | head -1 | tr -dc 0-9 >"$CODE_FILE" ) &
     PIDS+=("$!")
 fi
 
@@ -128,6 +128,7 @@ if ((HAVE_DESKTOP)); then
     check "pairing code shown as a desktop notification" grep -q "pairing code [0-9]\{6\} written" "$WORK/desktop.log"
 fi
 check "Mutter created the virtual monitor (2400x1080)" grep -q "mutter: virtual monitor 2400x1080" "$WORK/host.log"
+check "the HiDPI stream's monitor is at 200 % (DisplayConfig)" grep -q "mutter: virtual monitor Meta-[0-9]* at 200 %" "$WORK/host.log"
 check "PipeWire delivered frames (format negotiated)" grep -q "capture: PipeWire format" "$WORK/host.log"
 picture_ok() {
     # Mutter alone (no GNOME Shell) draws a grey gradient; the pointer is
