@@ -20,15 +20,16 @@ You can work on the Mac side without a phone: see "Testing without a phone" in t
 - `mac/Sources/Sidecast`: the menu-bar app (server, capture, encoding, virtual display, input injection, UI).
 - `mac/Sources/SidecastMicDriver`: the "Sidecast Microphone" Core Audio driver (C).
 - `android/app/src/main/java/.../`: `protocol/` and `net/` (codec, TLS, session), `video/`, `input/`, `audio/`, `store/`, `ui/`.
+- `rust/`: the Windows/Linux host in Rust: `sidecast-core` (pure, tested logic shared by the new hosts), `sidecast-server` (the host and the backend traits platform code implements), `sidecast-host` (CLI), `sidecast-probe` (conformance client). See [rust/README.md](rust/README.md); `make test-rust` and `make conformance` run its checks (Rust is optional for Mac and Android work).
 - `docs/PROTOCOL.md`: the wire protocol, the contract between the two sides.
 
 ## Ground rules
 
-- **The protocol is the contract.** Any change to the wire format updates `docs/PROTOCOL.md` (including the §8 test vectors) and both codecs and their tests in the same pull request. Keep changes backward compatible, or bump the protocol version.
-- **Put logic where it can be tested**: `SidecastKit` on the Mac, non-UI packages on Android, each with unit tests.
+- **The protocol is the contract.** Any change to the wire format updates `docs/PROTOCOL.md` (including the §8 test vectors) and every codec (Swift, Kotlin, Rust `sidecast-core`) and their tests in the same pull request. Keep changes backward compatible, or bump the protocol version.
+- **Put logic where it can be tested**: `SidecastKit` on the Mac, non-UI packages on Android, `sidecast-core` in Rust, each with unit tests.
 - **Record decisions.** A new behaviour or trade-off gets a line in `docs/DECISIONS.md`.
 - **Match the code around you**: naming, comment density, idioms. Comments explain *why*.
-- **Keep dependencies minimal.** The Mac app uses only Apple frameworks, and the Android app only AndroidX, Material Components and Kotlin coroutines. Discuss in an issue before adding a library.
+- **Keep dependencies minimal.** The Mac app uses only Apple frameworks, the Android app only AndroidX, Material Components and Kotlin coroutines, and the Rust crates only permissively licensed crates (MIT, Apache-2.0, BSD, ISC, Zlib; no GPL or LGPL), listed in THIRD_PARTY_NOTICES.md. Discuss in an issue before adding a library.
 - **Never weaken security** (TLS, pinning, pairing, tokens) to make something easier. See [SECURITY.md](SECURITY.md).
 
 ## New platforms
