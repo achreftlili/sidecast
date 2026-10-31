@@ -131,7 +131,7 @@ check "Mutter created the virtual monitor (2400x1080)" grep -q "mutter: virtual 
 check "the HiDPI stream's monitor is at 200 % (DisplayConfig)" grep -q "mutter: virtual monitor Meta-[0-9]* at 200 %" "$WORK/host.log"
 check "PipeWire delivered frames (format negotiated)" grep -q "capture: PipeWire format" "$WORK/host.log"
 # Not a check: a test session usually has no logind seat (or no system bus) to grant an inhibitor.
-grep -m1 "power: " "$WORK/host.log" | sed 's/^[0-9:. ]*\(WARN  \)\{0,1\}/    (info) /'
+grep -m1 -E "power: (keeping|logind)" "$WORK/host.log" | sed 's/^[0-9:. ]*\(WARN  \)\{0,1\}/    (info) /'
 picture_ok() {
     # Mutter alone (no GNOME Shell) draws a grey gradient; the pointer is
     # composited from the cursor metadata where Mutter last reported it.
