@@ -55,17 +55,13 @@ final class ProbeClient {
     // MARK: - Connection
 
     private func connect() {
-        let tls = NWProtocolTLS.Options()
-        let sec = tls.securityProtocolOptions
-        sec_protocol_options_set_min_tls_protocol_version(sec, .TLSv12)
-        // Trust on first pairing: accept any certificate here; the fingerprint
-        // is checked against the pinned one before any secret is sent.
-        sec_protocol_options_set_verify_block(sec, { _, _, complete in complete(true) }, queue)
-        let tcp = NWProtocolTCP.Options()
-        tcp.noDelay = true
+        // The same TLS setup as the iOS client, without a pin: trust on first pairing,
+        // and the fingerprint is checked against the stored one before any secret is sent.
+        // The probe keeps its own scripted session (not StreamClient) because it checks
+        // what a real client would hide: seq order, BYE after a failed AUTH, liveness.
         let connection = NWConnection(host: NWEndpoint.Host(options.host),
                                       port: NWEndpoint.Port(rawValue: options.port)!,
-                                      using: NWParameters(tls: tls, tcp: tcp))
+                                      using: ClientTLS.parameters(pin: nil, queue: queue))
         channel = MessageChannel(connection: connection, queue: queue)
         channel.onReady = { [weak self] in self?.connected() }
         channel.onFrame = { [weak self] frame in self?.handle(frame) }
