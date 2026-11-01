@@ -75,7 +75,7 @@ public struct GestureThresholds: Sendable {
     public var tapMaxDistance: Double = 15
     public var doubleTapMaxInterval: TimeInterval = 0.4
     public var doubleTapMaxDistance: Double = 20
-    /// Held at least this long without moving: release = right click, move = drag.
+    /// Held at least this long without moving: the left button goes down (lift = click, move = drag).
     public var longPressTime: TimeInterval = 0.5
     public var scrollSensitivity: Double = 1.2
     public var pinchMinDistance: Double = 20

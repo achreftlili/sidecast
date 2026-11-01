@@ -5,7 +5,9 @@ import Foundation
 /// gesture state machine):
 ///
 /// - tap → click; second tap nearby within 0.4 s → double click
-/// - hold ≥ 0.5 s, release → right click; hold ≥ 0.5 s, then move → left drag
+/// - hold still for 0.5 s → the left button goes down where the finger landed
+///   and stays down until the finger lifts: lift in place = a (long) left
+///   click, move = left drag
 /// - one-finger move → scroll (with momentum after a flick)
 /// - two-finger move → scroll (with momentum); two-finger pinch → zoom
 /// - two-finger tap (all fingers up within 0.3 s, no scroll/pinch) → right
@@ -23,7 +25,9 @@ import Foundation
 /// zoom at the cursor, 3/4-finger swipes as in touch mode, no long press.
 ///
 /// Durations use the client's `eventTimeMs` (immune to network jitter);
-/// momentum ticks run on the injected scheduler. Not thread-safe: call it
+/// the long-press timer and momentum ticks run on the injected scheduler
+/// (the button must go down while the finger is still resting, before any
+/// further event arrives). Not thread-safe: call it
 /// from the scheduler's serial context. `reset()` releases a held button.
 public final class GestureEngine {
     /// Optional diagnostics: why a click/right click was decided (never called on hot paths).
@@ -33,6 +37,7 @@ public final class GestureEngine {
         case idle
         case pending            // one finger down, gesture undecided
         case scrolling          // one-finger scroll
+        case holding            // long press, finger still in place: left button held
         case dragging           // long press + move: left button held
         case twoFingerPending
         case twoFingerScroll
@@ -65,6 +70,7 @@ public final class GestureEngine {
     private var scrollBegan = false
     private var velocity = (dx: 0.0, dy: 0.0)          // scroll units per second
     private var lastTap: (time: UInt32, point: CGPoint)?
+    private var longPressTask: ScheduledTask?
 
     private var startMidpoint = CGPoint.zero
     private var lastMidpoint = CGPoint.zero
@@ -107,8 +113,8 @@ public final class GestureEngine {
         self.output = output
     }
 
-    /// True while the engine holds the left button down (drag in progress).
-    public var isButtonHeld: Bool { state == .dragging || state == .trackpadDragging }
+    /// True while the engine holds the left button down (long press or drag in progress).
+    public var isButtonHeld: Bool { [.holding, .dragging, .trackpadDragging].contains(state) }
 
     /// Switches touch ↔ trackpad. A real change ends the current gesture cleanly
     /// (button released, scroll ended, momentum stopped) and forgets taps.
@@ -159,7 +165,7 @@ public final class GestureEngine {
 
     // MARK: - One finger
 
-    private var isOneFingerState: Bool { [.pending, .scrolling, .dragging].contains(state) }
+    private var isOneFingerState: Bool { [.pending, .scrolling, .holding, .dragging].contains(state) }
     private var isTwoFingerState: Bool { [.twoFingerPending, .twoFingerScroll, .pinching].contains(state) }
 
     private func fingerDown(_ event: TouchEvent) {
@@ -175,6 +181,25 @@ public final class GestureEngine {
         velocity = (0, 0)
         state = .pending
         output(.move(to: p))
+        cancelLongPress()
+        longPressTask = scheduler.schedule(after: thresholds.longPressTime) { [weak self] in
+            self?.longPressElapsed()
+        }
+    }
+
+    /// The finger rested in place for `longPressTime`: press the left button
+    /// where it landed and keep it down until the finger lifts or moves.
+    private func longPressElapsed() {
+        longPressTask = nil
+        guard state == .pending else { return }
+        trace?("left button down: long press")
+        state = .holding
+        output(.buttonDown(.left, at: startPoint))
+    }
+
+    private func cancelLongPress() {
+        longPressTask?.cancel()
+        longPressTask = nil
     }
 
     private func oneFingerMove(_ event: TouchEvent) {
@@ -186,7 +211,9 @@ public final class GestureEngine {
         switch state {
         case .pending:
             guard distance(p, startPoint) > slop(thresholds.tapMaxDistance) else { break }
+            cancelLongPress()
             if elapsed(startTime, t) >= thresholds.longPressTime {
+                // Held long enough by the phone's clock, but the timer has not run yet.
                 state = .dragging
                 output(.buttonDown(.left, at: startPoint))
                 output(.drag(to: p))
@@ -195,6 +222,11 @@ public final class GestureEngine {
                 scrollBegan = false
                 emitScroll(dx: p.x - lastPoint.x, dy: p.y - lastPoint.y, at: p, dt: dt)
             }
+        case .holding:
+            // Jitter within the slop leaves the press where it is.
+            guard distance(p, startPoint) > slop(thresholds.tapMaxDistance) else { break }
+            state = .dragging
+            output(.drag(to: p))
         case .scrolling:
             emitScroll(dx: p.x - lastPoint.x, dy: p.y - lastPoint.y, at: p, dt: dt)
         case .dragging:
@@ -209,16 +241,22 @@ public final class GestureEngine {
     private func lastFingerUp(_ event: TouchEvent) {
         let p = point(primaryPointer(event))
         let t = event.eventTimeMs
+        cancelLongPress()
         switch state {
         case .pending:
             guard distance(p, startPoint) <= slop(thresholds.tapMaxDistance) else { break }
             if elapsed(startTime, t) >= thresholds.longPressTime {
-                trace?("right click: long press \(Int(elapsed(startTime, t) * 1000)) ms")
-                output(.rightClick(at: p))
+                // Held long enough by the phone's clock, but the timer has not run yet:
+                // the left click the held button would have made.
+                trace?("click: long press \(Int(elapsed(startTime, t) * 1000)) ms")
+                output(.click(at: startPoint, count: 1))
             } else {
                 trace?("tap after \(Int(elapsed(startTime, t) * 1000)) ms")
                 tap(at: p, time: t)
             }
+        case .holding:
+            trace?("left button up: long press \(Int(elapsed(startTime, t) * 1000)) ms")
+            output(.buttonUp(.left, at: startPoint))
         case .scrolling:
             output(.scroll(dx: 0, dy: 0, at: p, phase: .ended))
             startMomentumIfFlicked(at: p, upTime: t)
@@ -340,7 +378,7 @@ public final class GestureEngine {
         case .twoFingerScroll:
             output(.scroll(dx: 0, dy: 0, at: anchor(lastMidpoint), phase: .ended))
             startMomentumIfFlicked(at: anchor(lastMidpoint), upTime: event.eventTimeMs)
-        case .dragging, .scrolling, .trackpadDragging:
+        case .holding, .dragging, .scrolling, .trackpadDragging:
             endCurrentGesture()
         default:
             break
@@ -477,7 +515,9 @@ public final class GestureEngine {
 
     /// Closes the current gesture cleanly (button up, scroll ended) and goes idle.
     private func endCurrentGesture() {
+        cancelLongPress()
         switch state {
+        case .holding: output(.buttonUp(.left, at: startPoint))
         case .dragging: output(.buttonUp(.left, at: lastPoint))
         case .scrolling: output(.scroll(dx: 0, dy: 0, at: lastPoint, phase: .ended))
         case .twoFingerScroll: output(.scroll(dx: 0, dy: 0, at: anchor(lastMidpoint), phase: .ended))

@@ -119,7 +119,7 @@ pub struct GestureThresholds {
     pub tap_max_distance: f64,
     pub double_tap_max_interval: f64,
     pub double_tap_max_distance: f64,
-    /// Held at least this long without moving: release = right click, move = drag.
+    /// Held at least this long without moving: the left button goes down (lift = click, move = drag).
     pub long_press_time: f64,
     pub scroll_sensitivity: f64,
     pub pinch_min_distance: f64,

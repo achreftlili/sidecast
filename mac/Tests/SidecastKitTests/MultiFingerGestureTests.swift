@@ -270,6 +270,19 @@ final class MultiFingerGestureTests: XCTestCase {
         XCTAssertEqual(rightClicks, [])
     }
 
+    func testSecondFingerReleasesALongPressWithoutARightClick() {
+        touch(0, .down, [(0, 200, 200)])
+        scheduler.advance(by: 0.5)
+        XCTAssertTrue(engine.isButtonHeld)
+        touch(600, .pointerDown, [(0, 200, 200), (1, 300, 200)], pid: 1)
+        XCTAssertFalse(engine.isButtonHeld)
+        XCTAssertEqual(actions.last, .buttonUp(.left, at: p(200, 200)))
+        touch(650, .pointerUp, [(0, 200, 200), (1, 300, 200)], pid: 1)
+        touch(700, .up, [(0, 200, 200)])
+        XCTAssertEqual(rightClicks, [])
+        XCTAssertFalse(hasClick)
+    }
+
     func testThirdFingerReleasesAHeldButton() {
         touch(0, .down, [(0, 200, 200)])
         touch(600, .move, [(0, 260, 200)])                        // long-press drag

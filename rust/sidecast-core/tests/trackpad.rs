@@ -172,9 +172,14 @@ fn slow_tap_and_long_press_do_nothing() {
     h.down(0, 500.0, 300.0);
     h.up(300, 500.0, 300.0); // > 250 ms
     h.down(1000, 500.0, 300.0);
+    h.advance(1.0);
     h.up(1900, 500.0, 300.0); // a long press
     assert!(h.clicks().is_empty());
     assert!(h.right_clicks().is_empty(), "no long-press right click in trackpad mode");
+    assert!(
+        !h.actions.iter().any(|a| matches!(a, GestureAction::ButtonDown { .. })),
+        "no long-press button in trackpad mode"
+    );
 }
 
 #[test]

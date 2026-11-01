@@ -2,7 +2,9 @@
 //! (itself ported from SideScreen's gesture state machine):
 //!
 //! - tap → click; second tap nearby within 0.4 s → double click
-//! - hold ≥ 0.5 s, release → right click; hold ≥ 0.5 s, then move → left drag
+//! - hold still for 0.5 s → the left button goes down where the finger landed
+//!   and stays down until the finger lifts: lift in place = a (long) left
+//!   click, move = left drag
 //! - one-finger move → scroll (with momentum after a flick)
 //! - two-finger move → scroll (with momentum); two-finger pinch → zoom
 //! - two-finger tap (all fingers up within 0.3 s, no scroll/pinch) → right
@@ -20,9 +22,11 @@
 //! cursor, 3/4-finger swipes as in touch mode, no long press.
 //!
 //! Durations use the client's `eventTimeMs` (immune to network jitter).
-//! Momentum needs a timer: after every call the driver checks
-//! [`GestureEngine::pending_timer`] and calls [`GestureEngine::fire_timer`]
-//! once its delay has passed. `reset` releases a held button.
+//! The long press and momentum need a timer (the button must go down while
+//! the finger is still resting, before any further event arrives): after
+//! every call the driver checks [`GestureEngine::pending_timer`] and calls
+//! [`GestureEngine::fire_timer`] once its delay has passed. `reset` releases
+//! a held button.
 
 use super::{GestureAction, GestureThresholds, MouseButton, ScrollPhase, SemanticAction};
 use crate::geometry::{Point, Size};
@@ -35,6 +39,8 @@ enum State {
     Pending,
     /// One-finger scroll.
     Scrolling,
+    /// Long press, finger still in place: left button held.
+    Holding,
     /// Long press + move: left button held.
     Dragging,
     TwoFingerPending,
@@ -55,6 +61,14 @@ enum State {
     TrackpadTapHold,
     /// Left button held, cursor follows the finger.
     TrackpadDragging,
+}
+
+/// What the engine's single timer is armed for: a long press while one
+/// finger rests, momentum after it lifts (a new touch stops momentum).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Timer {
+    LongPress,
+    Momentum,
 }
 
 /// A timer the engine wants: call [`GestureEngine::fire_timer`] with
@@ -92,7 +106,7 @@ pub struct GestureEngine {
     last_pinch_distance: f64,
     zoom_remainder: f64,
 
-    momentum_timer: Option<u64>,
+    timer: Option<(u64, Timer)>,
     timer_generation: u64,
     /// Per tick.
     momentum_step: (f64, f64),
@@ -158,7 +172,7 @@ impl GestureEngine {
             initial_pinch_distance: 0.0,
             last_pinch_distance: 0.0,
             zoom_remainder: 0.0,
-            momentum_timer: None,
+            timer: None,
             timer_generation: 0,
             momentum_step: (0.0, 0.0),
             momentum_point: Point::ZERO,
@@ -214,23 +228,45 @@ impl GestureEngine {
         self.cursor_initialized
     }
 
-    /// The engine holds the left button down (drag in progress).
+    /// The engine holds the left button down (long press or drag in progress).
     pub fn is_button_held(&self) -> bool {
-        matches!(self.state, State::Dragging | State::TrackpadDragging)
+        matches!(self.state, State::Holding | State::Dragging | State::TrackpadDragging)
     }
 
-    /// The momentum timer to arm, if any.
+    /// The timer to arm (long press or momentum), if any.
     pub fn pending_timer(&self) -> Option<PendingTimer> {
-        self.momentum_timer.map(|generation| PendingTimer { generation, delay: self.thresholds.momentum_tick })
+        self.timer.map(|(generation, timer)| PendingTimer {
+            generation,
+            delay: match timer {
+                Timer::LongPress => self.thresholds.long_press_time,
+                Timer::Momentum => self.thresholds.momentum_tick,
+            },
+        })
     }
 
     /// Runs the timer armed as `generation`; stale generations do nothing.
     pub fn fire_timer(&mut self, generation: u64) -> Vec<GestureAction> {
-        if self.momentum_timer == Some(generation) {
-            self.momentum_timer = None;
-            self.momentum_tick();
+        if let Some((armed, timer)) = self.timer
+            && armed == generation
+        {
+            self.timer = None;
+            match timer {
+                Timer::LongPress => self.long_press_elapsed(),
+                Timer::Momentum => self.momentum_tick(),
+            }
         }
         self.take_output()
+    }
+
+    fn arm(&mut self, timer: Timer) {
+        self.timer_generation += 1;
+        self.timer = Some((self.timer_generation, timer));
+    }
+
+    fn disarm(&mut self, timer: Timer) {
+        if self.timer.is_some_and(|(_, armed)| armed == timer) {
+            self.timer = None;
+        }
     }
 
     /// Switches touch ↔ trackpad. A real change ends the current gesture
@@ -310,7 +346,7 @@ impl GestureEngine {
     // MARK: - One finger
 
     fn is_one_finger_state(&self) -> bool {
-        matches!(self.state, State::Pending | State::Scrolling | State::Dragging)
+        matches!(self.state, State::Pending | State::Scrolling | State::Holding | State::Dragging)
     }
 
     fn is_two_finger_state(&self) -> bool {
@@ -332,6 +368,18 @@ impl GestureEngine {
         self.velocity = (0.0, 0.0);
         self.state = State::Pending;
         self.emit(GestureAction::Move { to: p });
+        self.arm(Timer::LongPress);
+    }
+
+    /// The finger rested in place for `long_press_time`: press the left
+    /// button where it landed and keep it down until the finger lifts or moves.
+    fn long_press_elapsed(&mut self) {
+        if self.state != State::Pending {
+            return;
+        }
+        log::debug!("left button down: long press");
+        self.state = State::Holding;
+        self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.start_point });
     }
 
     fn one_finger_move(&mut self, event: &TouchEvent) {
@@ -344,7 +392,9 @@ impl GestureEngine {
         match self.state {
             State::Pending => {
                 if p.distance(self.start_point) > self.slop(self.thresholds.tap_max_distance) {
+                    self.disarm(Timer::LongPress);
                     if elapsed(self.start_time, t) >= self.thresholds.long_press_time {
+                        // Held long enough by the phone's clock, but the timer has not run yet.
                         self.state = State::Dragging;
                         self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.start_point });
                         self.emit(GestureAction::Drag { to: p });
@@ -353,6 +403,13 @@ impl GestureEngine {
                         self.scroll_began = false;
                         self.emit_scroll(p.x - self.last_point.x, p.y - self.last_point.y, p, dt);
                     }
+                }
+            }
+            // Jitter within the slop leaves the press where it is.
+            State::Holding => {
+                if p.distance(self.start_point) > self.slop(self.thresholds.tap_max_distance) {
+                    self.state = State::Dragging;
+                    self.emit(GestureAction::Drag { to: p });
                 }
             }
             State::Scrolling => self.emit_scroll(p.x - self.last_point.x, p.y - self.last_point.y, p, dt),
@@ -366,18 +423,25 @@ impl GestureEngine {
     fn last_finger_up(&mut self, event: &TouchEvent) {
         let p = self.point(self.primary_pointer(event));
         let t = event.event_time_ms;
+        self.disarm(Timer::LongPress);
         match self.state {
             State::Pending => {
                 if p.distance(self.start_point) <= self.slop(self.thresholds.tap_max_distance) {
                     let held = elapsed(self.start_time, t);
                     if held >= self.thresholds.long_press_time {
-                        log::debug!("right click: long press {} ms", (held * 1000.0) as i64);
-                        self.emit(GestureAction::RightClick { at: p });
+                        // Held long enough by the phone's clock, but the timer has not run yet:
+                        // the left click the held button would have made.
+                        log::debug!("click: long press {} ms", (held * 1000.0) as i64);
+                        self.emit(GestureAction::Click { at: self.start_point, count: 1 });
                     } else {
                         log::debug!("tap after {} ms", (held * 1000.0) as i64);
                         self.tap(p, t);
                     }
                 }
+            }
+            State::Holding => {
+                log::debug!("left button up: long press {} ms", (elapsed(self.start_time, t) * 1000.0) as i64);
+                self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.start_point });
             }
             State::Scrolling => {
                 self.emit(GestureAction::Scroll { dx: 0.0, dy: 0.0, at: p, phase: ScrollPhase::Ended });
@@ -525,7 +589,7 @@ impl GestureEngine {
                 self.emit(GestureAction::Scroll { dx: 0.0, dy: 0.0, at, phase: ScrollPhase::Ended });
                 self.start_momentum_if_flicked(at, event.event_time_ms);
             }
-            State::Dragging | State::Scrolling | State::TrackpadDragging => self.end_current_gesture(),
+            State::Holding | State::Dragging | State::Scrolling | State::TrackpadDragging => self.end_current_gesture(),
             _ => {}
         }
         self.state = State::WaitingForRelease;
@@ -648,8 +712,7 @@ impl GestureEngine {
     }
 
     fn schedule_momentum_tick(&mut self) {
-        self.timer_generation += 1;
-        self.momentum_timer = Some(self.timer_generation);
+        self.arm(Timer::Momentum);
     }
 
     fn momentum_tick(&mut self) {
@@ -675,13 +738,15 @@ impl GestureEngine {
     }
 
     fn stop_momentum(&mut self) {
-        self.momentum_timer = None;
+        self.disarm(Timer::Momentum);
         self.finish_momentum();
     }
 
     /// Closes the current gesture cleanly (button up, scroll ended) and goes idle.
     fn end_current_gesture(&mut self) {
+        self.disarm(Timer::LongPress);
         match self.state {
+            State::Holding => self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.start_point }),
             State::Dragging => self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.last_point }),
             State::Scrolling => {
                 let at = self.last_point;

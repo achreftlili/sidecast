@@ -165,7 +165,7 @@ Pairings and settings are kept.
 Arrange the new display in System Settings → Displays like any monitor.
 
 ### Touch gestures
-- Tap = click · double tap = double click · long press or **two-finger tap** = right click · long press then drag = drag
+- Tap = click · double tap = double click · **hold ½ s** = left button down (lift = click, move = drag or select text) · **two-finger tap** = right click
 - One/two-finger swipe = scroll · pinch = zoom
 - **Three/four-finger swipe** left/right = switch Desktops and full-screen apps · up = Mission Control · down = App Exposé (uses the Mission Control shortcuts in System Settings → Keyboard → Keyboard Shortcuts, on by default)
 - Three-finger tap = stats overlay on the phone

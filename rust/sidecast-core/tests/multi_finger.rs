@@ -266,6 +266,21 @@ fn third_finger_mid_two_finger_scroll_ends_the_scroll_without_momentum_or_click(
 }
 
 #[test]
+fn second_finger_releases_a_long_press_without_a_right_click() {
+    let mut h = Harness::new();
+    h.touch(0, TouchAction::Down, &[(0, 200.0, 200.0)], None);
+    h.advance(0.5);
+    assert!(h.engine.is_button_held());
+    h.touch(600, TouchAction::PointerDown, &[(0, 200.0, 200.0), (1, 300.0, 200.0)], Some(1));
+    assert!(!h.engine.is_button_held());
+    assert_eq!(h.actions.last(), Some(&left_up(200.0, 200.0)));
+    h.touch(650, TouchAction::PointerUp, &[(0, 200.0, 200.0), (1, 300.0, 200.0)], Some(1));
+    h.touch(700, TouchAction::Up, &[(0, 200.0, 200.0)], None);
+    assert!(h.right_clicks().is_empty());
+    assert!(!h.has_click());
+}
+
+#[test]
 fn third_finger_releases_a_held_button() {
     let mut h = Harness::new();
     h.touch(0, TouchAction::Down, &[(0, 200.0, 200.0)], None);

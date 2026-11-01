@@ -74,16 +74,78 @@ final class GestureEngineTests: XCTestCase {
 
     // MARK: long press
 
-    func testLongPressRightClicks() {
+    func testLongPressHoldsTheLeftButtonUntilLift() {
         down(0, 200, 200)
-        up(650, 201, 200)
-        XCTAssertEqual(actions, [.move(to: p(200, 200)), .rightClick(at: p(201, 200))])
+        scheduler.advance(by: 0.49)
+        XCTAssertEqual(actions, [.move(to: p(200, 200))])
+        scheduler.advance(by: 0.01)
+        XCTAssertEqual(actions, [.move(to: p(200, 200)), .buttonDown(.left, at: p(200, 200))])
+        XCTAssertTrue(engine.isButtonHeld)
+        move(700, 204, 201)                  // jitter within the slop: the press stays put
+        up(1200, 204, 201)
+        XCTAssertEqual(actions, [
+            .move(to: p(200, 200)),
+            .buttonDown(.left, at: p(200, 200)),
+            .buttonUp(.left, at: p(200, 200)),
+        ])
+        XCTAssertFalse(engine.isButtonHeld)
+        XCTAssertEqual(scheduler.pendingCount, 0)
+    }
+
+    func testLongPressLiftedBeforeTheTimerRunsLeftClicks() {
+        down(0, 200, 200)
+        up(650, 201, 200)                    // 0.65 s by the phone's clock; the timer has not run
+        XCTAssertEqual(actions, [.move(to: p(200, 200)), .click(at: p(200, 200), count: 1)])
+        scheduler.advance(by: 1)
+        XCTAssertEqual(actions.count, 2, "the cancelled timer presses nothing")
+    }
+
+    func testTapCancelsTheLongPress() {
+        down(0, 200, 200)
+        up(100, 200, 200)
+        scheduler.advance(by: 1)
+        XCTAssertEqual(actions, [.move(to: p(200, 200)), .click(at: p(200, 200), count: 1)])
+        XCTAssertEqual(scheduler.pendingCount, 0)
+    }
+
+    func testScrollCancelsTheLongPress() {
+        down(0, 200, 200)
+        move(100, 200, 260)                  // moved before 0.5 s: a scroll
+        scheduler.advance(by: 1)
+        XCTAssertFalse(engine.isButtonHeld)
+        XCTAssertFalse(actions.contains { if case .buttonDown = $0 { return true } else { return false } })
+        XCTAssertEqual(scrolls.first?.2, .began)
+    }
+
+    func testLongPressThenMoveDrags() {
+        down(0, 200, 200)
+        scheduler.advance(by: 0.5)
+        move(600, 260, 200)
+        move(620, 300, 210)
+        up(640, 300, 210)
+        XCTAssertEqual(actions, [
+            .move(to: p(200, 200)),
+            .buttonDown(.left, at: p(200, 200)),
+            .drag(to: p(260, 200)),
+            .drag(to: p(300, 210)),
+            .drag(to: p(300, 210)),
+            .buttonUp(.left, at: p(300, 210)),
+        ])
+        XCTAssertFalse(engine.isButtonHeld)
+    }
+
+    func testResetReleasesALongPress() {
+        down(0, 200, 200)
+        scheduler.advance(by: 0.5)
+        engine.reset()
+        XCTAssertEqual(actions.last, .buttonUp(.left, at: p(200, 200)))
+        XCTAssertFalse(engine.isButtonHeld)
     }
 
     func testLongPressDrag() {
         down(0, 200, 200)
         move(300, 202, 200)                  // still within slop, too early
-        move(600, 260, 200)                  // held 0.6 s, then moved → drag
+        move(600, 260, 200)                  // held 0.6 s by the phone's clock (timer not run yet), then moved → drag
         move(620, 300, 210)
         up(640, 300, 210)
         XCTAssertEqual(actions, [
