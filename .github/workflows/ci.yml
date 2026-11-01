@@ -208,7 +208,7 @@ jobs:
         run: TMPDIR="$RUNNER_TEMP" ./scripts/linux-e2e.sh
       - name: Logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-gnome-e2e-logs
           path: ${{ runner.temp }}/sidecast-linux-e2e.*
