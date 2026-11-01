@@ -62,12 +62,87 @@ fn timestamps_may_wrap() {
 
 // MARK: long press
 
+fn left_down(x: f64, y: f64) -> GestureAction {
+    GestureAction::ButtonDown { button: MouseButton::Left, at: p(x, y) }
+}
+
 #[test]
-fn long_press_right_clicks() {
+fn long_press_holds_the_left_button_until_lift() {
     let mut h = Harness::new();
     h.down(0, 200.0, 200.0);
-    h.up(650, 201.0, 200.0);
-    assert_eq!(h.actions, [moved(200.0, 200.0), GestureAction::RightClick { at: p(201.0, 200.0) }]);
+    h.advance(0.49);
+    assert_eq!(h.actions, [moved(200.0, 200.0)]);
+    h.advance(0.01);
+    assert_eq!(h.actions, [moved(200.0, 200.0), left_down(200.0, 200.0)]);
+    assert!(h.engine.is_button_held());
+    h.move_to(700, 204.0, 201.0); // jitter within the slop: the press stays put
+    h.up(1200, 204.0, 201.0);
+    assert_eq!(h.actions, [moved(200.0, 200.0), left_down(200.0, 200.0), left_up(200.0, 200.0)]);
+    assert!(!h.engine.is_button_held());
+    assert_eq!(h.pending_count(), 0);
+}
+
+#[test]
+fn long_press_lifted_before_the_timer_runs_left_clicks() {
+    let mut h = Harness::new();
+    h.down(0, 200.0, 200.0);
+    h.up(650, 201.0, 200.0); // 0.65 s by the phone's clock; the timer has not run
+    assert_eq!(h.actions, [moved(200.0, 200.0), click(200.0, 200.0, 1)]);
+    h.advance(1.0);
+    assert_eq!(h.actions.len(), 2, "the cancelled timer presses nothing");
+}
+
+#[test]
+fn tap_cancels_the_long_press() {
+    let mut h = Harness::new();
+    h.down(0, 200.0, 200.0);
+    h.up(100, 200.0, 200.0);
+    h.advance(1.0);
+    assert_eq!(h.actions, [moved(200.0, 200.0), click(200.0, 200.0, 1)]);
+    assert_eq!(h.pending_count(), 0);
+}
+
+#[test]
+fn scroll_cancels_the_long_press() {
+    let mut h = Harness::new();
+    h.down(0, 200.0, 200.0);
+    h.move_to(100, 200.0, 260.0); // moved before 0.5 s: a scroll
+    h.advance(1.0);
+    assert!(!h.engine.is_button_held());
+    assert!(!h.actions.iter().any(|a| matches!(a, GestureAction::ButtonDown { .. })));
+    assert_eq!(h.scroll_phases().first(), Some(&ScrollPhase::Began));
+}
+
+#[test]
+fn long_press_then_move_drags() {
+    let mut h = Harness::new();
+    h.down(0, 200.0, 200.0);
+    h.advance(0.5);
+    h.move_to(600, 260.0, 200.0);
+    h.move_to(620, 300.0, 210.0);
+    h.up(640, 300.0, 210.0);
+    assert_eq!(
+        h.actions,
+        [
+            moved(200.0, 200.0),
+            left_down(200.0, 200.0),
+            GestureAction::Drag { to: p(260.0, 200.0) },
+            GestureAction::Drag { to: p(300.0, 210.0) },
+            GestureAction::Drag { to: p(300.0, 210.0) },
+            left_up(300.0, 210.0),
+        ]
+    );
+    assert!(!h.engine.is_button_held());
+}
+
+#[test]
+fn reset_releases_a_long_press() {
+    let mut h = Harness::new();
+    h.down(0, 200.0, 200.0);
+    h.advance(0.5);
+    h.reset();
+    assert_eq!(h.actions.last(), Some(&left_up(200.0, 200.0)));
+    assert!(!h.engine.is_button_held());
 }
 
 #[test]
@@ -75,7 +150,7 @@ fn long_press_drag() {
     let mut h = Harness::new();
     h.down(0, 200.0, 200.0);
     h.move_to(300, 202.0, 200.0); // still within slop, too early
-    h.move_to(600, 260.0, 200.0); // held 0.6 s, then moved → drag
+    h.move_to(600, 260.0, 200.0); // held 0.6 s by the phone's clock (timer not run yet), then moved → drag
     h.move_to(620, 300.0, 210.0);
     h.up(640, 300.0, 210.0);
     assert_eq!(

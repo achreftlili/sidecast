@@ -68,7 +68,7 @@ struct SettingsView: View {
 
             Section("Input") {
                 Toggle("Phone controls the Mac (touch & keyboard)", isOn: $settings.touchEnabled)
-                Text("Two-finger tap = right click. 3/4-finger swipes: left/right switch Desktops, up = Mission Control, "
+                Text("Hold ½ s = left button down (lift to click, move to drag). Two-finger tap = right click. 3/4-finger swipes: left/right switch Desktops, up = Mission Control, "
                      + "down = App Exposé (uses the Mission Control keyboard shortcuts in System Settings → Keyboard → "
                      + "Keyboard Shortcuts).")
                     .font(.caption).foregroundStyle(.secondary)

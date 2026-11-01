@@ -160,9 +160,13 @@ final class TrackpadTests: XCTestCase {
 
     func testSlowTapAndLongPressDoNothing() {
         down(0, 500, 300); up(300, 500, 300)        // > 250 ms
-        down(1000, 500, 300); up(1900, 500, 300)    // a long press
+        down(1000, 500, 300)
+        scheduler.advance(by: 1)
+        up(1900, 500, 300)                          // a long press
         XCTAssertEqual(clicks, [])
         XCTAssertEqual(rightClicks, [], "no long-press right click in trackpad mode")
+        XCTAssertFalse(actions.contains { if case .buttonDown = $0 { return true } else { return false } },
+                       "no long-press button in trackpad mode")
     }
 
     func testMovingBeyondTheSlopNeverClicks() {
