@@ -76,6 +76,10 @@ object MessageCodec {
             message.reason?.let { put("reason", it) }
         }
         is Cursor -> ByteBuffer.allocate(CURSOR_SIZE).putFloat(message.x).putFloat(message.y).array()
+        is Haptic -> {
+            require(message.kind in 0..0xFF) { "HAPTIC kind is u8" }
+            byteArrayOf(message.kind.toByte())
+        }
         is MicControl -> json {
             put("active", message.active)
             message.sampleRate?.let { put("sampleRate", it) }
@@ -176,8 +180,8 @@ object MessageCodec {
     fun decode(frame: Frame): Message? = decode(frame.type, frame.payload)
 
     /**
-     * Decodes one payload. Returns null for an unknown [type], and for a CURSOR of the wrong size
-     * (§7.3: ignored, never fatal).
+     * Decodes one payload. Returns null for an unknown [type], for a CURSOR of the wrong size
+     * (§7.3) and for a HAPTIC of an unknown kind or the wrong size (§7.4): ignored, never fatal.
      * @throws ProtocolException on any other malformed payload.
      */
     fun decode(type: Int, payload: ByteArray): Message? = try {
@@ -258,6 +262,7 @@ object MessageCodec {
         } else {
             null
         }
+        MessageType.HAPTIC -> payload.singleOrNull()?.toInt()?.and(0xFF)?.takeIf { it in Haptic.KNOWN_KINDS }?.let(::Haptic)
         MessageType.MIC_CONTROL -> payload.json().run {
             MicControl(
                 active = getBoolean("active"),

@@ -61,6 +61,7 @@ public enum MessageType: UInt8, CaseIterable, Sendable {
     case bye = 0x87
     case micControl = 0x88
     case cursor = 0x89
+    case haptic = 0x8A
 }
 
 /// Capabilities a client lists in HELLO `features` (PROTOCOL §5).

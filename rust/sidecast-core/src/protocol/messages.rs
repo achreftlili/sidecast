@@ -2,9 +2,9 @@ use super::binary::{ByteReader, encode_u32, encode_u64};
 use super::frame::encode_frame;
 use super::json::{decode_json, encode_json};
 use super::{
-    AudioPacket, AuthRequest, AuthResult, Bye, CursorPosition, Frame, Hello, InputModeMessage, KeyEvent, MessageType,
-    MicControl, MicState, PairChallenge, PairProof, ProtocolError, ServerHello, StreamConfig, TouchEvent, VideoFrame,
-    text,
+    AudioPacket, AuthRequest, AuthResult, Bye, CursorPosition, Frame, HapticKind, Hello, InputModeMessage, KeyEvent,
+    MessageType, MicControl, MicState, PairChallenge, PairProof, ProtocolError, ServerHello, StreamConfig, TouchEvent,
+    VideoFrame, text,
 };
 
 /// Messages sent by the phone (client) to the host (server).
@@ -115,6 +115,8 @@ pub enum ServerMessage {
     MicControl(MicControl),
     /// Trackpad-mode pointer position (PROTOCOL §7.3).
     Cursor(CursorPosition),
+    /// A short haptic tick on the phone (PROTOCOL §7.4).
+    Haptic(HapticKind),
 }
 
 impl ServerMessage {
@@ -129,6 +131,7 @@ impl ServerMessage {
             ServerMessage::Bye(_) => MessageType::Bye,
             ServerMessage::MicControl(_) => MessageType::MicControl,
             ServerMessage::Cursor(_) => MessageType::Cursor,
+            ServerMessage::Haptic(_) => MessageType::Haptic,
         }
     }
 
@@ -144,10 +147,12 @@ impl ServerMessage {
             ServerMessage::Bye(m) => encode_frame(t, &encode_json(m)),
             ServerMessage::MicControl(m) => encode_frame(t, &encode_json(m)),
             ServerMessage::Cursor(c) => encode_frame(t, &c.encode_payload()),
+            ServerMessage::Haptic(kind) => encode_frame(t, &kind.encode_payload()),
         }
     }
 
-    /// Decodes a frame sent by a server. `Ok(None)` for unknown types.
+    /// Decodes a frame sent by a server. `Ok(None)` for unknown types (and for a
+    /// HAPTIC of an unknown kind or a malformed one, which clients ignore, §7.4).
     pub fn decode(frame: &Frame) -> Result<Option<ServerMessage>, ProtocolError> {
         let Some(t) = frame.message_type() else { return Ok(None) };
         let p = frame.payload.as_slice();
@@ -161,6 +166,10 @@ impl ServerMessage {
             MessageType::Bye => ServerMessage::Bye(decode_json(p, t)?),
             MessageType::MicControl => ServerMessage::MicControl(decode_json(p, t)?),
             MessageType::Cursor => ServerMessage::Cursor(CursorPosition::decode(p)?),
+            MessageType::Haptic => match HapticKind::decode(p) {
+                Some(kind) => ServerMessage::Haptic(kind),
+                None => return Ok(None),
+            },
             _ => return Ok(None),
         };
         Ok(Some(message))

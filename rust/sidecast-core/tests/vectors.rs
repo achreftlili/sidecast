@@ -1,8 +1,8 @@
 //! PROTOCOL.md §8 test vectors, reproduced exactly (port of `ProtocolVectorTests.swift`).
 
 use sidecast_core::protocol::{
-    AudioPacket, ClientMessage, CursorPosition, Frame, FrameParser, HostPlatform, KeyEvent, KeyModifiers, MessageType,
-    PairProof, ProtocolKey, ServerMessage, TouchAction, TouchEvent, TouchPointer, VideoFrame, json_b64,
+    AudioPacket, ClientMessage, CursorPosition, Frame, FrameParser, HapticKind, HostPlatform, KeyEvent, KeyModifiers,
+    MessageType, PairProof, ProtocolKey, ServerMessage, TouchAction, TouchEvent, TouchPointer, VideoFrame, json_b64,
 };
 use sidecast_core::security::{
     PairingCode, PairingOutcome, PairingSession, device_token, from_hex, pairing_proof, sha256, to_hex,
@@ -137,6 +137,14 @@ fn cursor_vector() {
     let wire = hex("89 00 00 00 08 3f 00 00 00 3e 80 00 00");
     assert_eq!(ServerMessage::Cursor(CursorPosition::new(0.5, 0.25)).encode(), wire);
     assert_eq!(decode_server(&wire), Some(ServerMessage::Cursor(CursorPosition::new(0.5, 0.25))));
+}
+
+// §8.3 HAPTIC hold (1)
+#[test]
+fn haptic_vector() {
+    let wire = hex("8a 00 00 00 01 01");
+    assert_eq!(ServerMessage::Haptic(HapticKind::Hold).encode(), wire);
+    assert_eq!(decode_server(&wire), Some(ServerMessage::Haptic(HapticKind::Hold)));
 }
 
 // §8.3 PING t = 1

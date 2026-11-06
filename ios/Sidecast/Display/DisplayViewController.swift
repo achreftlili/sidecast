@@ -40,6 +40,7 @@ final class DisplayViewController: UIViewController {
     private let sequencer = TouchSequencer<ObjectIdentifier>()
     private lazy var filter = PointerFilter { [weak self] x, y, first in self?.isHeldBack(x, y, first: first) ?? false }
     private let tapDetector = ThreeFingerTapDetector(slop: 12)
+    private let holdFeedback = UIImpactFeedbackGenerator(style: .light)
     private var takenPresses = Set<ObjectIdentifier>()
     private var statsTimer: Timer?
     private var modeLabelTimer: Timer?
@@ -190,6 +191,10 @@ final class DisplayViewController: UIViewController {
         controller.onCursor = { [weak self] in
             self?.cursor = $0
             self?.renderPointer()
+        }
+        controller.onHaptic = { [weak self] kind in
+            guard let self, self.playing, kind == .hold else { return }
+            self.holdFeedback.impactOccurred()
         }
         controller.onMicCapturing = { [weak self] in self?.micChip.isHidden = !$0 }
     }

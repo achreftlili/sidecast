@@ -164,6 +164,10 @@ class RecordingListener : StreamClient.Listener {
         events.add(cursor)
     }
 
+    override fun onHaptic(haptic: com.achreftlili.sidecast.protocol.Haptic) {
+        events.add(haptic)
+    }
+
     override fun onEnded(reason: StreamClient.EndReason) {
         events.add(Ended(reason))
     }

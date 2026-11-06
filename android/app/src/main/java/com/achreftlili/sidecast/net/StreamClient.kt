@@ -7,6 +7,7 @@ import com.achreftlili.sidecast.protocol.Base64Codec
 import com.achreftlili.sidecast.protocol.Bye
 import com.achreftlili.sidecast.protocol.ClientMessage
 import com.achreftlili.sidecast.protocol.Cursor
+import com.achreftlili.sidecast.protocol.Haptic
 import com.achreftlili.sidecast.protocol.FrameAck
 import com.achreftlili.sidecast.protocol.FrameReader
 import com.achreftlili.sidecast.protocol.Hello
@@ -140,6 +141,9 @@ class StreamClient(
 
         /** CURSOR while streaming (§7.3); up to 60 per second, on the reader thread. */
         fun onCursor(cursor: Cursor) {}
+
+        /** HAPTIC while streaming (§7.4), on the reader thread. */
+        fun onHaptic(haptic: Haptic) {}
 
         /** Connected; how the Mac was reached, when the connector knows. */
         fun onRoute(route: Route) {}
@@ -326,6 +330,7 @@ class StreamClient(
             }
             is Bye -> end(EndReason.ServerEnded(message.reason))
             is Cursor -> if (state == State.STREAMING) listener.onCursor(message) // earlier: ignored
+            is Haptic -> if (state == State.STREAMING) listener.onHaptic(message) // earlier: ignored
             is MicControl -> {
                 // Only meaningful for a streaming client; anything earlier is ignored (§7.2).
                 if (state == State.STREAMING) listener.onMicControl(message) else log("ignoring early MIC_CONTROL")

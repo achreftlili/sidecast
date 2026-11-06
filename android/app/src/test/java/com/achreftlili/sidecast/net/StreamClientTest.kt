@@ -6,6 +6,7 @@ import com.achreftlili.sidecast.protocol.Auth
 import com.achreftlili.sidecast.protocol.AuthResult
 import com.achreftlili.sidecast.protocol.Base64Codec
 import com.achreftlili.sidecast.protocol.Cursor
+import com.achreftlili.sidecast.protocol.Haptic
 import com.achreftlili.sidecast.protocol.MessageType
 import com.achreftlili.sidecast.protocol.Bye
 import com.achreftlili.sidecast.protocol.FrameAck
@@ -668,6 +669,26 @@ class StreamClientTest {
         assertEquals(Cursor(-1f, -1f), listener.await<Cursor>())
         assertTrue(c.isStreaming)
         assertNull(listener.events.firstOrNull { it is RecordingListener.Ended })
+    }
+
+    @Test
+    fun hapticIsDeliveredOnlyWhileStreamingAndBadOnesAreIgnored() {
+        storePairing()
+        val c = startClient()
+        val peer = mac.accept()
+        peer.expect<Hello>()
+        peer.send(Haptic(Haptic.HOLD)) // before authentication: ignored, not fatal
+        peer.send(ServerHello(Protocol.VERSION, serverId, "Test Mac"))
+        peer.expect<Auth>()
+        peer.send(AuthResult(ok = true))
+        listener.await<StreamClient.ServerIdentity>()
+
+        peer.sendRaw(encodeFrame(MessageType.HAPTIC, ByteArray(0))) // malformed: ignored
+        peer.sendRaw(encodeFrame(MessageType.HAPTIC, byteArrayOf(9))) // unknown kind: ignored
+        peer.send(Haptic(Haptic.HOLD))
+        assertEquals(Haptic(Haptic.HOLD), listener.await<Haptic>())
+        assertTrue(c.isStreaming)
+        assertNull(listener.events.firstOrNull { it is Haptic || it is RecordingListener.Ended })
     }
 
     @Test

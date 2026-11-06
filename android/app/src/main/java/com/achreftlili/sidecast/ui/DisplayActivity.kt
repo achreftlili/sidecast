@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.SurfaceHolder
@@ -39,6 +40,7 @@ import com.achreftlili.sidecast.input.VideoRect
 import com.achreftlili.sidecast.net.Route
 import com.achreftlili.sidecast.net.SessionState
 import com.achreftlili.sidecast.protocol.Cursor
+import com.achreftlili.sidecast.protocol.Haptic
 import com.achreftlili.sidecast.protocol.InputModeName
 import com.achreftlili.sidecast.protocol.StreamConfig
 import com.achreftlili.sidecast.video.DecoderStatus
@@ -168,6 +170,14 @@ class DisplayActivity : AppCompatActivity(), OverlayActions {
                     session.cursor.collect {
                         cursor = it
                         schedulePointer()
+                    }
+                }
+                launch {
+                    session.haptics.collect {
+                        // The system's touch-feedback setting applies; no VIBRATE permission needed.
+                        if (playing && it.kind == Haptic.HOLD) {
+                            binding.surface.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        }
                     }
                 }
                 launch {

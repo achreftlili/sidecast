@@ -126,6 +126,7 @@ final class ProbeClient {
         case .pong(let t): stats.recordRTT(Double(MonotonicTimeSource.nowMicros &- t) / 1e6)
         case .micControl(let control): handleMicControl(control)
         case .cursor(let position): handleCursor(position)
+        case .haptic(let kind): print("probe: HAPTIC \(kind)")
         case .bye(let bye):
             if phase == .finished { return }
             if let authFailure { return concludeAuthFailure(authFailure, bye: bye.reason) }

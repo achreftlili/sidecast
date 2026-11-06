@@ -389,6 +389,7 @@ impl Probe {
             }
             ServerMessage::MicControl(control) => self.handle_mic_control(control),
             ServerMessage::Cursor(position) => self.handle_cursor(position),
+            ServerMessage::Haptic(kind) => println!("probe: HAPTIC {kind:?}"),
             ServerMessage::Bye(bye) => {
                 if let Some((reason, _)) = self.auth_failure.clone() {
                     return self.conclude_auth_failure(&reason, Some(&bye.reason));

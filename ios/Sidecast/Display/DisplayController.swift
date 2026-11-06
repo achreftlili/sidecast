@@ -30,6 +30,8 @@ final class DisplayController {
     var onState: ((DisplaySession.State) -> Void)?
     var onStreamConfig: ((StreamConfig) -> Void)?
     var onCursor: ((CursorPosition?) -> Void)?
+    /// HAPTIC (§7.4): the computer pressed the button after a ½ s hold.
+    var onHaptic: ((HapticKind) -> Void)?
     var onRoute: ((Route?) -> Void)?
     var onMicCapturing: ((Bool) -> Void)?
     var onDecoderStatus: ((DecoderStatus) -> Void)? {
@@ -109,6 +111,7 @@ final class DisplayController {
         }
         session.onVideoFrame = { decoder.decode($0) }
         session.onCursor = { [weak self] cursor in DispatchQueue.main.async { self?.onCursor?(cursor) } }
+        session.onHaptic = { [weak self] kind in DispatchQueue.main.async { self?.onHaptic?(kind) } }
         session.onRoute = { [weak self] route in DispatchQueue.main.async { self?.onRoute?(route) } }
         session.onMicControl = { mic.handle($0) }
         session.onMicSessionEnded = { mic.sessionEnded() }

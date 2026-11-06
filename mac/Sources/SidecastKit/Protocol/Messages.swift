@@ -119,6 +119,8 @@ public enum ServerMessage: Equatable, Sendable {
     case micControl(MicControl)
     /// Trackpad-mode pointer position (PROTOCOL §7.3).
     case cursor(CursorPosition)
+    /// A short haptic tick on the phone (PROTOCOL §7.4).
+    case haptic(HapticKind)
 
     public var type: MessageType {
         switch self {
@@ -131,6 +133,7 @@ public enum ServerMessage: Equatable, Sendable {
         case .bye: return .bye
         case .micControl: return .micControl
         case .cursor: return .cursor
+        case .haptic: return .haptic
         }
     }
 
@@ -147,10 +150,12 @@ public enum ServerMessage: Equatable, Sendable {
         case .bye(let m): return Frame(.bye, payload: WireJSON.encode(m)).encoded()
         case .micControl(let m): return Frame(.micControl, payload: WireJSON.encode(m)).encoded()
         case .cursor(let c): return Frame(.cursor, payload: c.encodedPayload()).encoded()
+        case .haptic(let kind): return Frame(.haptic, payload: Data([kind.rawValue])).encoded()
         }
     }
 
-    /// Decodes a frame sent by a server. Returns nil for unknown types.
+    /// Decodes a frame sent by a server. Returns nil for unknown types (and for a HAPTIC
+    /// of an unknown kind or a malformed one, which clients ignore, §7.4).
     public static func decode(_ frame: Frame) throws -> ServerMessage? {
         guard let type = frame.messageType else { return nil }
         let p = frame.payload
@@ -167,6 +172,7 @@ public enum ServerMessage: Equatable, Sendable {
         case .bye: return .bye(try WireJSON.decode(Bye.self, from: p, as: type))
         case .micControl: return .micControl(try WireJSON.decode(MicControl.self, from: p, as: type))
         case .cursor: return .cursor(try CursorPosition.decode(p))
+        case .haptic: return HapticKind.decode(p).map { .haptic($0) }
         default:
             return nil
         }

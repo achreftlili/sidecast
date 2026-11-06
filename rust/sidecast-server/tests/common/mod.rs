@@ -386,7 +386,10 @@ impl TestClient {
                         self.send(ClientMessage::FrameAck(frame.seq)).await;
                     }
                 }
-                ServerMessage::Pong(_) | ServerMessage::Cursor(_) | ServerMessage::MicControl(_) => {}
+                ServerMessage::Pong(_)
+                | ServerMessage::Cursor(_)
+                | ServerMessage::Haptic(_)
+                | ServerMessage::MicControl(_) => {}
                 other => panic!("unexpected {other:?} while waiting for {what}"),
             }
         }
@@ -469,7 +472,10 @@ impl TestClient {
                     self.frames_seen += 1;
                     return frame;
                 }
-                ServerMessage::Pong(_) | ServerMessage::Cursor(_) | ServerMessage::MicControl(_) => {}
+                ServerMessage::Pong(_)
+                | ServerMessage::Cursor(_)
+                | ServerMessage::Haptic(_)
+                | ServerMessage::MicControl(_) => {}
                 other => panic!("unexpected {other:?} while waiting for a frame"),
             }
         }

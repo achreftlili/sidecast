@@ -161,6 +161,15 @@ class MessageCodecTest {
     }
 
     @Test
+    fun hapticOfAnUnknownKindOrTheWrongSizeIsIgnoredNotFatal() {
+        assertEquals(0x8A, MessageType.HAPTIC)
+        assertTrue(MessageType.isKnown(MessageType.HAPTIC))
+        for (payload in listOf(byteArrayOf(), byteArrayOf(0), byteArrayOf(2), byteArrayOf(-1), byteArrayOf(1, 0))) {
+            assertNull("payload ${payload.toList()}", MessageCodec.decode(MessageType.HAPTIC, payload))
+        }
+    }
+
+    @Test
     fun cursorOnDisplayRules() {
         assertTrue(Cursor(0f, 0f).onDisplay)
         assertTrue(Cursor(1f, 1f).onDisplay)
