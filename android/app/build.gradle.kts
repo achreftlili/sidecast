@@ -25,7 +25,7 @@ android {
         applicationId = "com.achreftlili.sidecast"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
+        versionCode = 8
         versionName = appVersion
     }
 

@@ -1555,7 +1555,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "sidecast-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "base64",
  "getrandom 0.4.3",
@@ -1570,7 +1570,7 @@ dependencies = [
 
 [[package]]
 name = "sidecast-host"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "ashpd",
  "async-io",
@@ -1589,7 +1589,7 @@ dependencies = [
 
 [[package]]
 name = "sidecast-probe"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "log",
  "openh264",
@@ -1603,7 +1603,7 @@ dependencies = [
 
 [[package]]
 name = "sidecast-server"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "gethostname",
  "if-addrs",
