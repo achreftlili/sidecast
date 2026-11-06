@@ -64,10 +64,12 @@ object MessageType {
     const val BYE = 0x87
     const val MIC_CONTROL = 0x88
     const val CURSOR = 0x89
+    const val HAPTIC = 0x8A
 
     private val KNOWN = setOf(
         HELLO, AUTH, PAIR_START, PAIR_PROOF, TOUCH, FRAME_ACK, KEYFRAME_REQUEST, PING, TEXT, KEY, AUDIO, MIC_STATE, INPUT_MODE,
         SERVER_HELLO, PAIR_CHALLENGE, AUTH_RESULT, STREAM_CONFIG, VIDEO_FRAME, PONG, BYE, MIC_CONTROL, CURSOR,
+        HAPTIC,
     )
 
     fun isKnown(type: Int): Boolean = type in KNOWN

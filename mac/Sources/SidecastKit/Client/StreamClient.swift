@@ -53,6 +53,7 @@ public protocol StreamClientDelegate: AnyObject {
     /// Already acknowledged (FRAME_ACK is sent on receipt, before decoding, §6).
     func streamClient(_ client: StreamClient, didReceive frame: VideoFrame)
     func streamClient(_ client: StreamClient, didReceive cursor: CursorPosition)
+    func streamClient(_ client: StreamClient, didReceive haptic: HapticKind)
     func streamClient(_ client: StreamClient, didReceive micControl: MicControl)
     func streamClient(_ client: StreamClient, didConnectVia route: Route)
     /// Exactly once per client.
@@ -66,6 +67,7 @@ extension StreamClientDelegate {
     public func streamClient(_ client: StreamClient, didReceive config: StreamConfig) {}
     public func streamClient(_ client: StreamClient, didReceive frame: VideoFrame) {}
     public func streamClient(_ client: StreamClient, didReceive cursor: CursorPosition) {}
+    public func streamClient(_ client: StreamClient, didReceive haptic: HapticKind) {}
     public func streamClient(_ client: StreamClient, didReceive micControl: MicControl) {}
     public func streamClient(_ client: StreamClient, didConnectVia route: Route) {}
 }
@@ -348,6 +350,8 @@ public final class StreamClient {
             end(.serverEnded(bye.reason))
         case .cursor(let position):
             if state == .streaming { delegate?.streamClient(self, didReceive: position) }
+        case .haptic(let kind):
+            if state == .streaming { delegate?.streamClient(self, didReceive: kind) }
         case .micControl(let control):
             // Only meaningful for a streaming client; anything earlier is ignored (§7.2).
             if state == .streaming { delegate?.streamClient(self, didReceive: control) } else { log("ignoring early MIC_CONTROL") }

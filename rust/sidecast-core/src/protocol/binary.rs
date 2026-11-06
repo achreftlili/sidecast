@@ -286,6 +286,28 @@ impl CursorPosition {
     }
 }
 
+/// HAPTIC payload (PROTOCOL §7.4): one byte, the kind of tick the phone gives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum HapticKind {
+    /// The host pressed the left button because the finger rested ½ s.
+    Hold = 1,
+}
+
+impl HapticKind {
+    pub fn encode_payload(self) -> Vec<u8> {
+        vec![self as u8]
+    }
+
+    /// `None` for an unknown kind or a malformed payload: the client ignores it (never fatal).
+    pub fn decode(payload: &[u8]) -> Option<HapticKind> {
+        match payload {
+            [1] => Some(HapticKind::Hold),
+            _ => None,
+        }
+    }
+}
+
 /// `seq` (FRAME_ACK) or `t` (PING/PONG) payloads.
 pub(crate) fn encode_u32(msg_type: MessageType, value: u32) -> Vec<u8> {
     encode_frame(msg_type as u8, &value.to_be_bytes())

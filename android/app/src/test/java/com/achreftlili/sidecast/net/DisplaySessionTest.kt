@@ -6,6 +6,7 @@ import com.achreftlili.sidecast.protocol.Base64Codec
 import com.achreftlili.sidecast.protocol.Bye
 import com.achreftlili.sidecast.protocol.Audio
 import com.achreftlili.sidecast.protocol.Cursor
+import com.achreftlili.sidecast.protocol.Haptic
 import com.achreftlili.sidecast.protocol.Hello
 import com.achreftlili.sidecast.protocol.HostPlatform
 import com.achreftlili.sidecast.protocol.InputMode
@@ -21,6 +22,12 @@ import com.achreftlili.sidecast.protocol.VideoFrame
 import com.achreftlili.sidecast.protocol.sha256
 import com.achreftlili.sidecast.protocol.toHex
 import com.achreftlili.sidecast.store.PairedMac
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -190,6 +197,17 @@ class DisplaySessionTest {
         first.close()
         awaitState("reconnecting") { it is SessionState.Reconnecting }
         assertNull("no stale pointer while reconnecting", session.cursor.value)
+    }
+
+    @Test
+    fun hapticsOfTheCurrentConnectionAreEmittedOneByOne() = runBlocking {
+        session.start()
+        val first = mac.accept()
+        authenticate(first)
+        awaitState("streaming") { it is SessionState.Streaming }
+        val received = async(start = CoroutineStart.UNDISPATCHED) { session.haptics.take(2).toList() }
+        first.send(Haptic(Haptic.HOLD), Haptic(Haptic.HOLD))
+        assertEquals("two holds, not conflated", listOf(Haptic(Haptic.HOLD), Haptic(Haptic.HOLD)), withTimeout(5_000) { received.await() })
     }
 
     @Test

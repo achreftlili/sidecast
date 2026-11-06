@@ -337,6 +337,21 @@ data class Cursor(val x: Float, val y: Float) : ServerMessage {
     val onDisplay: Boolean get() = x in 0f..1f && y in 0f..1f
 }
 
+/**
+ * HAPTIC (§7.4): the phone gives a short haptic tick. [HOLD]: the computer pressed the left button
+ * because the finger rested ½ s.
+ */
+data class Haptic(val kind: Int) : ServerMessage {
+    override val type: Int get() = MessageType.HAPTIC
+
+    companion object {
+        const val HOLD = 1
+
+        /** The kinds this client knows; others are ignored (§7.4). */
+        val KNOWN_KINDS = setOf(HOLD)
+    }
+}
+
 /** MIC_CONTROL (§7.2): the Mac wants the phone's microphone ([active]) or no longer does. */
 data class MicControl(
     val active: Boolean,

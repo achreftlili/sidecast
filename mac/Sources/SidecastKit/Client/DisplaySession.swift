@@ -34,6 +34,8 @@ public final class DisplaySession: StreamClientDelegate {
     public var onVideoFrame: ((VideoFrame) -> Void)?
     /// The computer's pointer (§7.3), or nil when unknown (new connection, mode change).
     public var onCursor: ((CursorPosition?) -> Void)?
+    /// HAPTIC of the current stream (§7.4): the phone gives a short tick.
+    public var onHaptic: ((HapticKind) -> Void)?
     /// The path being tried or used, nil between attempts (§1.1).
     public var onRoute: ((Route?) -> Void)?
     /// MIC_CONTROL of the current stream (§7.2).
@@ -255,6 +257,10 @@ public final class DisplaySession: StreamClientDelegate {
 
     public func streamClient(_ client: StreamClient, didReceive cursor: CursorPosition) {
         if client === self.client { onCursor?(cursor) }
+    }
+
+    public func streamClient(_ client: StreamClient, didReceive haptic: HapticKind) {
+        if client === self.client { onHaptic?(haptic) }
     }
 
     public func streamClient(_ client: StreamClient, didReceive micControl: MicControl) {

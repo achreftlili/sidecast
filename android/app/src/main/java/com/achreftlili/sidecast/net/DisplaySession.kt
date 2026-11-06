@@ -5,6 +5,7 @@ import com.achreftlili.sidecast.net.StreamClient.PairingPrompt
 import com.achreftlili.sidecast.net.StreamClient.Phase
 import com.achreftlili.sidecast.protocol.Audio
 import com.achreftlili.sidecast.protocol.Cursor
+import com.achreftlili.sidecast.protocol.Haptic
 import com.achreftlili.sidecast.protocol.InputModeName
 import com.achreftlili.sidecast.protocol.MicControl
 import com.achreftlili.sidecast.protocol.MicState
@@ -12,8 +13,12 @@ import com.achreftlili.sidecast.protocol.StreamConfig
 import com.achreftlili.sidecast.protocol.Touch
 import com.achreftlili.sidecast.protocol.VideoFrame
 import com.achreftlili.sidecast.store.PairingRepository
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -92,6 +97,12 @@ class DisplaySession(
      * StateFlow conflates bursts); null until the first CURSOR after (re)connecting or a mode change.
      */
     val cursor: StateFlow<Cursor?> = _cursor.asStateFlow()
+
+    // Room for a burst; the reader thread never blocks (a stale tick is worthless, so the oldest goes).
+    private val _haptics = MutableSharedFlow<Haptic>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** HAPTIC of the current connection (§7.4): each one, not conflated; none is replayed to a late collector. */
+    val haptics: SharedFlow<Haptic> = _haptics.asSharedFlow()
 
     private val _route = MutableStateFlow<Route?>(null)
 
@@ -356,6 +367,10 @@ class DisplaySession(
 
         override fun onCursor(cursor: Cursor) {
             if (isCurrent) _cursor.value = cursor
+        }
+
+        override fun onHaptic(haptic: Haptic) {
+            if (isCurrent) _haptics.tryEmit(haptic)
         }
 
         override fun onRoute(route: Route) {

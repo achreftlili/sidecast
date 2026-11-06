@@ -87,6 +87,21 @@ final class ClickAndCursorTests: XCTestCase {
         XCTAssertEqual(try ServerMessage.decode(try XCTUnwrap(try parser.nextFrame())), .cursor(CursorPosition(x: 0.5, y: 0.25)))
     }
 
+    // §8.3 HAPTIC hold (1)
+    func testHapticVector() throws {
+        let wire = Data([0x8a, 0x00, 0x00, 0x00, 0x01, 0x01])
+        XCTAssertEqual(ServerMessage.haptic(.hold).encoded(), wire)
+        let parser = FrameParser()
+        parser.append(wire)
+        XCTAssertEqual(try ServerMessage.decode(try XCTUnwrap(try parser.nextFrame())), .haptic(.hold))
+    }
+
+    func testHapticOfAnUnknownKindOrMalformedIsIgnored() throws {
+        for payload in [Data(), Data([0]), Data([2]), Data([1, 1])] {
+            XCTAssertNil(try ServerMessage.decode(Frame(.haptic, payload: payload)), "\(Array(payload))")
+        }
+    }
+
     func testCursorOffDisplayAndTruncation() throws {
         let off = ServerMessage.cursor(.offDisplay).encoded()
         XCTAssertEqual(Array(off.dropFirst(5)), [0xbf, 0x80, 0, 0, 0xbf, 0x80, 0, 0])   // -1.0, -1.0

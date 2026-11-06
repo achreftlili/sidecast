@@ -83,6 +83,7 @@ payload : `length` bytes
 | `0x87` | BYE | JSON `{"reason": string}` then the server closes |
 | `0x88` | MIC_CONTROL | JSON `{"active": bool, "sampleRate"?: 48000, "channels"?: 1}`, see §7.2 |
 | `0x89` | CURSOR | binary `x: f32`, `y: f32` (big-endian, normalized 0…1 to the video frame), see §7.3 |
+| `0x8A` | HAPTIC | binary `kind: u8`, see §7.4 |
 
 `reason` values: `bad_code`, `too_many_attempts`, `pairing_expired`, `unknown_device`, `protocol_mismatch`, `replaced` (another phone took over), `server_shutdown`, `display_failed`, `permission_missing` (the host may not capture the screen, e.g. Screen Recording not granted on a Mac).
 
@@ -256,6 +257,11 @@ The host exposes a virtual input device (on a Mac, **Sidecast Microphone**). Whe
 - Hosts inject clicks human-like (pointer move to the target, button down, ~40 ms hold, button up) because some apps (Chromium/Electron, e.g. VS Code) ignore zero-duration synthetic clicks.
 - Trackpad-mode gestures (server side): 1-finger move = move cursor (with acceleration); tap = click at the cursor; double tap = double click; double-tap-and-hold then move = drag; 2-finger tap = right click; 2-finger move = scroll; pinch = zoom; 3/4-finger swipes = navigation (as in touch mode). Long press does nothing in trackpad mode.
 
+### 7.4 Haptic feedback
+
+- **HAPTIC** (`0x8A`, server → client, binary, 1 byte `kind`): the phone gives a short haptic tick. `1` = `hold`: the host pressed the left button because the finger rested ½ s without moving (touch-mode hold, trackpad tap-then-hold), so the user feels when a hold starts. The phone plays it with the system's touch feedback, which the user can turn off in the phone's settings.
+- Hosts send it only to an authenticated, streaming client. Clients ignore unknown kinds and malformed payloads (empty, or longer than 1 byte); neither is fatal. Older clients skip the type (§3), so no feature flag is needed.
+
 ## 8. Test vectors
 
 Implementations MUST include unit tests reproducing these exactly.
@@ -322,6 +328,12 @@ CURSOR x = 0.5, y = 0.25:
 
 ```
 89 00 00 00 08 3f 00 00 00 3e 80 00 00
+```
+
+HAPTIC hold (1):
+
+```
+8a 00 00 00 01 01
 ```
 
 PING t = 1:

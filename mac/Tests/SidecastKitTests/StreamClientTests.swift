@@ -58,6 +58,7 @@ final class ClientEvents: StreamClientDelegate {
     var configs: [StreamConfig] = []
     var frames: [UInt32] = []
     var cursors: [CursorPosition] = []
+    var haptics: [HapticKind] = []
     var micControls: [MicControl] = []
     var routes: [Route] = []
     var ended: [StreamClient.EndReason] = []
@@ -74,6 +75,7 @@ final class ClientEvents: StreamClientDelegate {
         sentAtFrame.append(transport?.sent.count ?? -1)
     }
     func streamClient(_ client: StreamClient, didReceive cursor: CursorPosition) { cursors.append(cursor) }
+    func streamClient(_ client: StreamClient, didReceive haptic: HapticKind) { haptics.append(haptic) }
     func streamClient(_ client: StreamClient, didReceive micControl: MicControl) { micControls.append(micControl) }
     func streamClient(_ client: StreamClient, didConnectVia route: Route) { routes.append(route) }
     func streamClient(_ client: StreamClient, didEndWith reason: StreamClient.EndReason) { ended.append(reason) }
@@ -353,6 +355,22 @@ final class StreamClientTests: XCTestCase {
         XCTAssertEqual(events.cursors, [CursorPosition(x: 0.5, y: 0.25)])
     }
 
+    func testHapticOnlyWhileStreamingAndBadOnesAreIgnored() {
+        connectAndGreet()
+        transport.deliver(.haptic(.hold))
+        XCTAssertTrue(events.haptics.isEmpty)
+        setUp()
+        streamAfterAuth()
+        transport.deliver(.haptic(.hold))
+        XCTAssertEqual(events.haptics, [.hold])
+        // Unknown kinds and malformed payloads are ignored, never fatal (§7.4).
+        for payload in [Data(), Data([9]), Data([1, 0])] {
+            transport.onFrame?(Frame(.haptic, payload: payload))
+        }
+        XCTAssertEqual(events.haptics, [.hold])
+        XCTAssertTrue(events.ended.isEmpty)
+    }
+
     func testUnknownMessageTypesAreSkipped() {
         streamAfterAuth()
         transport.onFrame?(Frame(type: 0xEE, payload: Data([1, 2, 3])))
@@ -544,6 +562,15 @@ final class DisplaySessionTests: XCTestCase {
         XCTAssertEqual(ended, 1)
         session.sendMicState(MicState(capturing: false, reason: .stopped))
         XCTAssertEqual(transports[0].sent.count, 1)
+    }
+
+    func testHapticGoesToTheCurrentStream() {
+        var haptics: [HapticKind] = []
+        session.onHaptic = { haptics.append($0) }
+        session.start()
+        pairAndStream(0)
+        transports[0].deliver(.haptic(.hold))
+        XCTAssertEqual(haptics, [.hold])
     }
 
     func testInputModeIsAnnouncedOnEveryConnection() {

@@ -7,7 +7,7 @@ use sidecast_core::input::{
     ClickTiming, CursorDecision, CursorThrottle, GestureAction, GestureThresholds, MouseButton, PointerEvent,
     PointerEventKind, ScrollPhase, SemanticAction, TimelineStep, click_timeline, describe_timeline, play_timeline,
 };
-use sidecast_core::protocol::{CursorPosition, Frame, FrameParser, MessageType, ServerMessage};
+use sidecast_core::protocol::{CursorPosition, Frame, FrameParser, HapticKind, MessageType, ServerMessage};
 use sidecast_core::{Point, Size};
 
 use PointerEventKind::{ButtonDown, ButtonUp, Dragged, Moved};
@@ -151,6 +151,26 @@ fn cursor_vector() {
         ServerMessage::decode(&parser.next_frame().unwrap().unwrap()),
         Ok(Some(ServerMessage::Cursor(CursorPosition::new(0.5, 0.25))))
     );
+}
+
+// §8.3 HAPTIC hold (1)
+#[test]
+fn haptic_vector() {
+    let wire = [0x8a, 0x00, 0x00, 0x00, 0x01, 0x01];
+    assert_eq!(ServerMessage::Haptic(HapticKind::Hold).encode(), wire);
+    let mut parser = FrameParser::new();
+    parser.push(&wire);
+    assert_eq!(
+        ServerMessage::decode(&parser.next_frame().unwrap().unwrap()),
+        Ok(Some(ServerMessage::Haptic(HapticKind::Hold)))
+    );
+}
+
+#[test]
+fn haptic_of_an_unknown_kind_or_malformed_is_ignored() {
+    for payload in [vec![], vec![0], vec![2], vec![1, 1]] {
+        assert_eq!(ServerMessage::decode(&Frame::new(MessageType::Haptic, payload.clone())), Ok(None), "{payload:?}");
+    }
 }
 
 #[test]

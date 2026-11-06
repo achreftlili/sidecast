@@ -107,6 +107,13 @@ class ProtocolVectorsTest {
     }
 
     @Test
+    fun hapticVector() {
+        val bytes = hex("8a 00 00 00 01 01")
+        assertEquals(Haptic(Haptic.HOLD), MessageCodec.decode(FrameReader(bytes.inputStream()).next()!!))
+        assertArrayEquals(bytes, MessageCodec.encode(Haptic(Haptic.HOLD)))
+    }
+
+    @Test
     fun pingVector() {
         assertArrayEquals(hex("13 00 00 00 08 00 00 00 00 00 00 00 01"), MessageCodec.encode(Ping(1)))
     }

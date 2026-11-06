@@ -6,7 +6,7 @@ mod json;
 mod keyboard;
 mod messages;
 
-pub use binary::{AudioPacket, CursorPosition, TouchAction, TouchEvent, TouchPointer, VideoFrame};
+pub use binary::{AudioPacket, CursorPosition, HapticKind, TouchAction, TouchEvent, TouchPointer, VideoFrame};
 pub use frame::{Frame, FrameParser};
 /// Base64 as carried in JSON (encode, lenient decode, serde helpers).
 pub use json::b64 as json_b64;
@@ -95,10 +95,11 @@ pub enum MessageType {
     Bye = 0x87,
     MicControl = 0x88,
     Cursor = 0x89,
+    Haptic = 0x8A,
 }
 
 impl MessageType {
-    pub const ALL: [MessageType; 22] = [
+    pub const ALL: [MessageType; 23] = [
         MessageType::Hello,
         MessageType::Auth,
         MessageType::PairStart,
@@ -121,6 +122,7 @@ impl MessageType {
         MessageType::Bye,
         MessageType::MicControl,
         MessageType::Cursor,
+        MessageType::Haptic,
     ];
 
     /// The known type for a wire byte, or `None` (such frames must be skipped).
@@ -153,6 +155,7 @@ impl MessageType {
             MessageType::Bye => "BYE",
             MessageType::MicControl => "MIC_CONTROL",
             MessageType::Cursor => "CURSOR",
+            MessageType::Haptic => "HAPTIC",
         }
     }
 }
