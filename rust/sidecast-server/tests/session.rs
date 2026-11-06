@@ -11,8 +11,8 @@ use common::*;
 use sidecast_core::annexb::inspect_access_unit;
 use sidecast_core::input::{InputEvent, Key, MouseButton, PointerEventKind};
 use sidecast_core::protocol::{
-    AudioPacket, AuthRequest, ClientMessage, HostPlatform, InputMode, InputModeMessage, KeyEvent, KeyModifiers,
-    MessageType, MicState, ProtocolKey, ServerMessage, TouchAction, TouchEvent, TouchPointer, VideoFrame,
+    AudioPacket, AuthRequest, ClientMessage, HapticKind, HostPlatform, InputMode, InputModeMessage, KeyEvent,
+    KeyModifiers, MessageType, MicState, ProtocolKey, ServerMessage, TouchAction, TouchEvent, TouchPointer, VideoFrame,
 };
 use sidecast_core::streaming::{StreamSettings, VideoCodec};
 use sidecast_server::ServerEvent;
@@ -289,6 +289,43 @@ async fn trackpad_mode_reports_the_pointer() {
     assert!(
         server.events.lock().unwrap().iter().any(|e| matches!(e, ServerEvent::InputModeChanged(InputMode::Trackpad)))
     );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn a_hold_presses_the_button_and_ticks_the_phone() {
+    let _port = PORT_LOCK.lock().await;
+    let server = start_server(FakeDisplay::default()).await;
+    let mut phone = TestClient::connect("holder").await;
+    phone.pair(&[]).await;
+    phone.stream_config().await;
+    phone.video_frame().await;
+    // A finger resting 0.5 s presses the left button on the host's timer, and the phone ticks.
+    phone.send(touch(1000, TouchAction::Down, 0.5, 0.5)).await;
+    let kind = phone
+        .expect("HAPTIC", |m| match m {
+            ServerMessage::Haptic(kind) => Some(*kind),
+            _ => None,
+        })
+        .await;
+    assert_eq!(kind, HapticKind::Hold);
+    phone.send(touch(1800, TouchAction::Up, 0.5, 0.5)).await;
+    phone.send(ClientMessage::Ping(7)).await;
+    phone.expect("PONG", |m| matches!(m, ServerMessage::Pong(7)).then_some(())).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let pointer: Vec<PointerEventKind> = server
+        .input
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|e| match e {
+            InputEvent::Pointer(p) => Some(p.kind),
+            _ => None,
+        })
+        .collect();
+    assert!(pointer.contains(&PointerEventKind::ButtonDown(MouseButton::Left)));
+    assert_eq!(pointer.last(), Some(&PointerEventKind::ButtonUp(MouseButton::Left)));
     server.stop().await;
 }
 

@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 
 use sidecast_core::input::{CursorDecision, CursorThrottle};
 use sidecast_core::protocol::{
-    ByeReason, CursorPosition, InputMode, KEYFRAME_INTERVAL, KeyEvent, LIVENESS_TIMEOUT, ServerMessage, TouchEvent,
-    VideoFrame,
+    ByeReason, CursorPosition, HapticKind, InputMode, KEYFRAME_INTERVAL, KeyEvent, LIVENESS_TIMEOUT, ServerMessage,
+    TouchEvent, VideoFrame,
 };
 use sidecast_core::streaming::{
     AbrConfig, AdaptiveBitrateController, BitrateBounds, InFlightTracker, StreamPlan, StreamPlanner, StreamSettings,
@@ -132,10 +132,26 @@ impl Drop for FrameSlot {
 
 /// What the stream's helpers report back to the session task.
 pub(crate) enum StreamEvent {
-    Started { generation: u64, result: Result<StartedStream, BackendError> },
-    Encoded { generation: u64, frame: Option<EncodedFrame>, pts_micros: u64, requested_keyframe: bool },
-    EncoderFailed { generation: u64, error: BackendError },
-    Cursor { position: CursorPosition, force: bool },
+    Started {
+        generation: u64,
+        result: Result<StartedStream, BackendError>,
+    },
+    Encoded {
+        generation: u64,
+        frame: Option<EncodedFrame>,
+        pts_micros: u64,
+        requested_keyframe: bool,
+    },
+    EncoderFailed {
+        generation: u64,
+        error: BackendError,
+    },
+    Cursor {
+        position: CursorPosition,
+        force: bool,
+    },
+    /// The left button went down on a resting finger: HAPTIC hold.
+    Hold,
 }
 
 pub(crate) struct StartedStream {
@@ -518,6 +534,15 @@ impl StreamController {
         self.out.send(ServerMessage::Cursor(position).encode());
         self.cursors_in_window += 1;
         self.last_cursor = Some(position);
+    }
+
+    // MARK: - HAPTIC
+
+    /// The button went down on a resting finger: the phone ticks (PROTOCOL §7.4).
+    pub fn on_hold(&mut self) {
+        if self.running {
+            self.out.send(ServerMessage::Haptic(HapticKind::Hold).encode());
+        }
     }
 
     /// When the session should call [`Self::on_deadline`].
