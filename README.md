@@ -165,11 +165,11 @@ Pairings and settings are kept.
 Arrange the new display in System Settings → Displays like any monitor.
 
 ### Touch gestures
-- Tap = click · double tap = double click · **hold ½ s** = left button down (lift = click, move = drag or select text) · **two-finger tap** = right click
+- Tap = click · double tap = double click · **hold ½ s** = left button down, with a short vibration (lift = click, move = drag or select text) · **two-finger tap** = right click
 - One/two-finger swipe = scroll · pinch = zoom
 - **Three/four-finger swipe** left/right = switch Desktops and full-screen apps · up = Mission Control · down = App Exposé (uses the Mission Control shortcuts in System Settings → Keyboard → Keyboard Shortcuts, on by default)
 - Three-finger tap = stats overlay on the phone
-- **Trackpad mode** (button on the phone): the phone works like a laptop trackpad with a large visible pointer. Tap clicks where the pointer is; best for small targets such as editor tabs.
+- **Trackpad mode** (button on the phone): the phone works like a laptop trackpad with a large visible pointer. Tap clicks where the pointer is; best for small targets such as editor tabs. Tap, then touch again and slide = drag, or rest ½ s instead = hold the button down at the pointer until you lift (for press-and-hold buttons).
 
 ### Keyboard and microphone
 - Tap the **Keyboard** button on the phone to type into the focused Mac app; the phone keyboard's dictation works too.

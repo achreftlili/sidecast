@@ -11,6 +11,7 @@ import SidecastKit
 final class TestPatternBackend: StreamBackend {
     var onRuntimeFailure: ((Error) -> Void)?
     var onCursor: ((CursorPosition, Bool) -> Void)?
+    var onHold: (() -> Void)?
     private var displaySize = CGSize.zero
     private let queue = DispatchQueue(label: "com.achreftlili.sidecast.testpattern", qos: .userInteractive)
     private var timer: DispatchSourceTimer?
@@ -23,6 +24,7 @@ final class TestPatternBackend: StreamBackend {
             self?.logGesture(action)
         }
         engine.trace = { Log.info("test pattern: \($0)") }
+        engine.onHold = { [weak self] in self?.onHold?() }
         return engine
     }()
     private var scrollSteps = 0

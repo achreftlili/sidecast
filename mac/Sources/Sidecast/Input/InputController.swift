@@ -18,6 +18,7 @@ final class InputController {
             if self.mode == .trackpad, let p = action.pointerLocation { self.report(CursorPosition(point: p, in: self.displaySize)) }
         }
         engine.trace = { Log.info("input: \($0)") }
+        engine.onHold = { [weak self] in self?.onHold?() }
         // Trackpad mode starts from the real cursor when it is on our display.
         engine.cursorProvider = { [weak self] in
             guard let self, self.displayID != kCGNullDirectDisplay, let location = CGEvent(source: nil)?.location else {
@@ -37,6 +38,8 @@ final class InputController {
 
     /// Trackpad mode: pointer positions for CURSOR (input queue). The Bool forces a send.
     var onCursor: ((CursorPosition, Bool) -> Void)?
+    /// The engine pressed the button on a resting finger, for HAPTIC (input queue).
+    var onHold: (() -> Void)?
     private var trusted = false
     private var trustCheckedAt: TimeInterval = -1
     private var reportedMissing = false

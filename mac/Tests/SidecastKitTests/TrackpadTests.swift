@@ -159,14 +159,90 @@ final class TrackpadTests: XCTestCase {
     }
 
     func testSlowTapAndLongPressDoNothing() {
-        down(0, 500, 300); up(300, 500, 300)        // > 250 ms
+        down(0, 500, 300); up(450, 500, 300)        // > 400 ms
         down(1000, 500, 300)
         scheduler.advance(by: 1)
-        up(1900, 500, 300)                          // a long press
+        up(1900, 500, 300)                          // a single resting finger
         XCTAssertEqual(clicks, [])
         XCTAssertEqual(rightClicks, [], "no long-press right click in trackpad mode")
         XCTAssertFalse(actions.contains { if case .buttonDown = $0 { return true } else { return false } },
-                       "no long-press button in trackpad mode")
+                       "a single resting finger never presses in trackpad mode")
+    }
+
+    func testTapsUpTo400MillisecondsClick() {
+        down(0, 500, 300); up(380, 500, 300)
+        XCTAssertEqual(clicks, [.click(at: centre, count: 1)])
+    }
+
+    // MARK: - Tap then hold
+
+    private var holds = 0
+
+    private func tapThenRest() {
+        engine.onHold = { [unowned self] in self.holds += 1 }
+        down(0, 500, 300); up(60, 500, 300)
+        down(200, 700, 100)                         // anywhere on the phone: it presses at the cursor
+        scheduler.advance(by: 0.5)
+    }
+
+    func testTapThenHoldPressesTheButtonAtTheCursorUntilLift() {
+        tapThenRest()
+        XCTAssertEqual(actions.last, .buttonDown(.left, at: centre))
+        XCTAssertTrue(engine.isButtonHeld)
+        XCTAssertEqual(holds, 1)
+        move(800, 704, 102)                         // jitter within the slop: the press stays put
+        up(1500, 704, 102)
+        XCTAssertEqual(actions.last, .buttonUp(.left, at: centre))
+        XCTAssertFalse(engine.isButtonHeld)
+        XCTAssertEqual(clicks, [.click(at: centre, count: 1)], "the hold is not a double click")
+        XCTAssertEqual(engine.cursor, centre)
+    }
+
+    func testTapThenHoldThenMoveDrags() {
+        tapThenRest()
+        let end = slide(from: 800, 700, 100, dx: 40, steps: 20, every: 50)   // slow, beyond the slop
+        XCTAssertTrue(engine.isButtonHeld)
+        up(end + 20, 740, 100)
+        let drags = actions.compactMap { if case .drag(let p) = $0 { return p } else { return nil } }
+        XCTAssertFalse(drags.isEmpty)
+        XCTAssertEqual(drags.last!.x, 512 + 40 * 0.6, accuracy: 1e-6, "relative drag, whole travel applied")
+        XCTAssertEqual(actions.last, .buttonUp(.left, at: engine.cursor))
+        XCTAssertEqual(actions.filter { if case .buttonDown = $0 { return true } else { return false } }.count, 1)
+    }
+
+    func testTapThenHoldLiftedBeforeTheTimerRunsClicks() {
+        down(0, 500, 300); up(60, 500, 300)
+        down(200, 500, 300)
+        up(800, 500, 300)                           // 0.6 s by the phone's clock; the timer has not run
+        XCTAssertEqual(clicks, [.click(at: centre, count: 1), .click(at: centre, count: 1)])
+        scheduler.advance(by: 1)
+        XCTAssertFalse(actions.contains { if case .buttonDown = $0 { return true } else { return false } })
+    }
+
+    func testSlowSecondTouchShortOfAHoldDoesNothing() {
+        down(0, 500, 300); up(60, 500, 300)
+        down(200, 500, 300)
+        up(650, 500, 300)                           // 450 ms: too slow for a double tap, too short for a hold
+        scheduler.advance(by: 1)
+        XCTAssertEqual(clicks, [.click(at: centre, count: 1)])
+        XCTAssertFalse(actions.contains { if case .buttonDown = $0 { return true } else { return false } })
+    }
+
+    func testSecondFingerReleasesATrackpadHoldWithoutARightClick() {
+        tapThenRest()
+        touch(800, .pointerDown, [(0, 700, 100), (1, 760, 100)], pid: 1)
+        XCTAssertEqual(actions.last, .buttonUp(.left, at: centre))
+        touch(850, .pointerUp, [(0, 700, 100), (1, 760, 100)], pid: 1)
+        touch(900, .up, [(0, 700, 100)])
+        XCTAssertEqual(rightClicks, [])
+        XCTAssertFalse(engine.isButtonHeld)
+    }
+
+    func testModeChangeReleasesATrackpadHold() {
+        tapThenRest()
+        engine.setMode(.touch)
+        XCTAssertEqual(actions.last, .buttonUp(.left, at: centre))
+        XCTAssertFalse(engine.isButtonHeld)
     }
 
     func testMovingBeyondTheSlopNeverClicks() {

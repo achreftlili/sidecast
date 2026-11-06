@@ -134,6 +134,42 @@ final class GestureEngineTests: XCTestCase {
         XCTAssertFalse(engine.isButtonHeld)
     }
 
+    func testOnHoldFiresOnceWhenTheTimerPressesTheButton() {
+        var holds = 0
+        engine.onHold = { holds += 1 }
+        down(0, 200, 200)
+        scheduler.advance(by: 0.5)
+        XCTAssertEqual(holds, 1)
+        up(900, 200, 200)
+        // Inferred late from the phone's clock (the finger is already up or moving): no tick.
+        down(2000, 200, 200)
+        up(2650, 200, 200)
+        down(4000, 200, 200)
+        move(4600, 260, 200)
+        up(4620, 260, 200)
+        // Tap and scroll never press.
+        down(6000, 200, 200); up(6080, 200, 200)
+        down(8000, 200, 200); move(8100, 200, 260); up(8120, 200, 260)
+        scheduler.advance(by: 1)
+        XCTAssertEqual(holds, 1)
+    }
+
+    func testEveryOneFingerOutcomeIsTraced() {
+        var lines: [String] = []
+        engine.trace = { lines.append($0) }
+        func gesture(_ steps: () -> Void) -> [String] {
+            lines = []
+            steps()
+            return lines
+        }
+        XCTAssertEqual(gesture { down(0, 200, 200); up(80, 200, 200) }, ["tap after 80 ms"])
+        XCTAssertEqual(gesture { down(1000, 200, 200); move(1100, 200, 260); up(1200, 200, 300) }, ["scroll after 100 ms"])
+        XCTAssertEqual(gesture { down(2000, 200, 200); up(2050, 200, 260) }, ["no click: lifted 60 dp away after 50 ms"])
+        XCTAssertEqual(gesture { down(3000, 200, 200); scheduler.advance(by: 0.5); move(3600, 260, 200); up(3700, 260, 200) },
+                       ["left button down: long press", "drag: after a long press"])
+        XCTAssertEqual(gesture { down(5000, 200, 200); move(5600, 260, 200); up(5700, 260, 200) }, ["drag: long press 600 ms"])
+    }
+
     func testResetReleasesALongPress() {
         down(0, 200, 200)
         scheduler.advance(by: 0.5)

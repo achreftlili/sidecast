@@ -17,9 +17,14 @@
 //!
 //! Trackpad mode (PROTOCOL §7.3) keeps a cursor of its own and moves it by
 //! finger deltas × an accelerated gain: tap = click at the cursor, double tap
-//! = double click, double-tap-and-hold then move = drag, two-finger tap =
-//! right click at the cursor, two-finger move/pinch = scroll/zoom at the
-//! cursor, 3/4-finger swipes as in touch mode, no long press.
+//! = double click, tap then touch again and hold still for 0.5 s = left button
+//! held at the cursor until the finger lifts (move = drag), double-tap-and-hold
+//! then move = drag, two-finger tap = right click at the cursor, two-finger
+//! move/pinch = scroll/zoom at the cursor, 3/4-finger swipes as in touch mode.
+//! A single resting finger never presses the button there.
+//!
+//! Every gesture's outcome (click, scroll, drag, pointer move, or why nothing
+//! happened) is logged at debug level.
 //!
 //! Durations use the client's `eventTimeMs` (immune to network jitter).
 //! The long press and momentum need a timer (the button must go down while
@@ -57,8 +62,10 @@ enum State {
     TrackpadPending,
     /// Moved past the slop: only moves the cursor.
     TrackpadPointing,
-    /// Second touch right after a tap: double tap, or drag once it moves.
+    /// Second touch right after a tap: double tap, hold, or drag once it moves.
     TrackpadTapHold,
+    /// Tap then hold, finger still in place: left button held at the cursor.
+    TrackpadHolding,
     /// Left button held, cursor follows the finger.
     TrackpadDragging,
 }
@@ -108,6 +115,8 @@ pub struct GestureEngine {
 
     timer: Option<(u64, Timer)>,
     timer_generation: u64,
+    /// The long-press timer pressed the button since the last `take_hold_started`.
+    hold_started: bool,
     /// Per tick.
     momentum_step: (f64, f64),
     momentum_point: Point,
@@ -174,6 +183,7 @@ impl GestureEngine {
             zoom_remainder: 0.0,
             timer: None,
             timer_generation: 0,
+            hold_started: false,
             momentum_step: (0.0, 0.0),
             momentum_point: Point::ZERO,
             momentum_started: false,
@@ -230,7 +240,15 @@ impl GestureEngine {
 
     /// The engine holds the left button down (long press or drag in progress).
     pub fn is_button_held(&self) -> bool {
-        matches!(self.state, State::Holding | State::Dragging | State::TrackpadDragging)
+        matches!(self.state, State::Holding | State::Dragging | State::TrackpadHolding | State::TrackpadDragging)
+    }
+
+    /// True once after the long-press timer pressed the left button on a
+    /// resting finger (touch hold or trackpad tap-then-hold): the phone can
+    /// confirm it with a haptic tick (HAPTIC). Never set when the press is only
+    /// inferred late from the phone's clock.
+    pub fn take_hold_started(&mut self) -> bool {
+        std::mem::take(&mut self.hold_started)
     }
 
     /// The timer to arm (long press or momentum), if any.
@@ -372,14 +390,24 @@ impl GestureEngine {
     }
 
     /// The finger rested in place for `long_press_time`: press the left
-    /// button where it landed and keep it down until the finger lifts or moves.
+    /// button (where it landed, or at the trackpad cursor) and keep it down
+    /// until the finger lifts or moves.
     fn long_press_elapsed(&mut self) {
-        if self.state != State::Pending {
-            return;
+        match self.state {
+            State::Pending => {
+                log::debug!("left button down: long press");
+                self.state = State::Holding;
+                self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.start_point });
+            }
+            State::TrackpadTapHold => {
+                log::debug!("trackpad: left button down: tap then hold");
+                self.state = State::TrackpadHolding;
+                self.last_tap = None;
+                self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.cursor });
+            }
+            _ => return,
         }
-        log::debug!("left button down: long press");
-        self.state = State::Holding;
-        self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.start_point });
+        self.hold_started = true;
     }
 
     fn one_finger_move(&mut self, event: &TouchEvent) {
@@ -395,10 +423,12 @@ impl GestureEngine {
                     self.disarm(Timer::LongPress);
                     if elapsed(self.start_time, t) >= self.thresholds.long_press_time {
                         // Held long enough by the phone's clock, but the timer has not run yet.
+                        log::debug!("drag: long press {} ms", ms(self.start_time, t));
                         self.state = State::Dragging;
                         self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.start_point });
                         self.emit(GestureAction::Drag { to: p });
                     } else {
+                        log::debug!("scroll after {} ms", ms(self.start_time, t));
                         self.state = State::Scrolling;
                         self.scroll_began = false;
                         self.emit_scroll(p.x - self.last_point.x, p.y - self.last_point.y, p, dt);
@@ -408,6 +438,7 @@ impl GestureEngine {
             // Jitter within the slop leaves the press where it is.
             State::Holding => {
                 if p.distance(self.start_point) > self.slop(self.thresholds.tap_max_distance) {
+                    log::debug!("drag: after a long press");
                     self.state = State::Dragging;
                     self.emit(GestureAction::Drag { to: p });
                 }
@@ -426,21 +457,22 @@ impl GestureEngine {
         self.disarm(Timer::LongPress);
         match self.state {
             State::Pending => {
-                if p.distance(self.start_point) <= self.slop(self.thresholds.tap_max_distance) {
-                    let held = elapsed(self.start_time, t);
-                    if held >= self.thresholds.long_press_time {
-                        // Held long enough by the phone's clock, but the timer has not run yet:
-                        // the left click the held button would have made.
-                        log::debug!("click: long press {} ms", (held * 1000.0) as i64);
-                        self.emit(GestureAction::Click { at: self.start_point, count: 1 });
-                    } else {
-                        log::debug!("tap after {} ms", (held * 1000.0) as i64);
-                        self.tap(p, t);
-                    }
+                let away = p.distance(self.start_point);
+                if away > self.slop(self.thresholds.tap_max_distance) {
+                    // Lifted beyond the slop before any MOVE got that far.
+                    log::debug!("no click: lifted {} dp away after {} ms", self.dp(away), ms(self.start_time, t));
+                } else if elapsed(self.start_time, t) >= self.thresholds.long_press_time {
+                    // Held long enough by the phone's clock, but the timer has not run yet:
+                    // the left click the held button would have made.
+                    log::debug!("click: long press {} ms", ms(self.start_time, t));
+                    self.emit(GestureAction::Click { at: self.start_point, count: 1 });
+                } else {
+                    log::debug!("tap after {} ms", ms(self.start_time, t));
+                    self.tap(p, t);
                 }
             }
             State::Holding => {
-                log::debug!("left button up: long press {} ms", (elapsed(self.start_time, t) * 1000.0) as i64);
+                log::debug!("left button up: long press {} ms", ms(self.start_time, t));
                 self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.start_point });
             }
             State::Scrolling => {
@@ -460,12 +492,14 @@ impl GestureEngine {
                     && elapsed(self.start_time, t) <= self.thresholds.two_finger_tap_max_duration
                     && p.distance(tap_point) <= self.slop(self.thresholds.tap_max_distance)
                 {
-                    log::debug!("right click: two-finger tap {} ms", (elapsed(self.start_time, t) * 1000.0) as i64);
+                    log::debug!("right click: two-finger tap {} ms", ms(self.start_time, t));
                     if self.mode == InputMode::Trackpad {
                         self.cursor = self.secondary_click_point;
                     }
                     self.emit(GestureAction::RightClick { at: self.secondary_click_point });
                     self.last_tap = None;
+                } else {
+                    log::debug!("no right click: two-finger tap took {} ms", ms(self.start_time, t));
                 }
             }
             // MultiFinger: the swipe (if any) already navigated; a tap does nothing.
@@ -531,9 +565,11 @@ impl GestureEngine {
         }
         if self.state == State::TwoFingerPending {
             if (d - self.initial_pinch_distance).abs() > self.slop(self.thresholds.pinch_min_distance) {
+                log::debug!("pinch");
                 self.state = State::Pinching;
                 self.zoom_remainder = 0.0;
             } else if mid.distance(self.start_midpoint) > self.slop(self.thresholds.tap_max_distance) {
+                log::debug!("two-finger scroll");
                 self.state = State::TwoFingerScroll;
                 self.scroll_began = false;
                 self.velocity = (0.0, 0.0);
@@ -583,13 +619,20 @@ impl GestureEngine {
                     self.state = State::TwoFingerTapPending;
                     return;
                 }
+                if self.two_finger_tap_eligible {
+                    log::debug!("no right click: two fingers held {} ms", ms(self.start_time, event.event_time_ms));
+                } else {
+                    log::debug!("no right click: the first finger was already scrolling or pressing");
+                }
             }
             State::TwoFingerScroll => {
                 let at = self.anchor(self.last_midpoint);
                 self.emit(GestureAction::Scroll { dx: 0.0, dy: 0.0, at, phase: ScrollPhase::Ended });
                 self.start_momentum_if_flicked(at, event.event_time_ms);
             }
-            State::Holding | State::Dragging | State::Scrolling | State::TrackpadDragging => self.end_current_gesture(),
+            State::Holding | State::Dragging | State::Scrolling | State::TrackpadHolding | State::TrackpadDragging => {
+                self.end_current_gesture()
+            }
             _ => {}
         }
         self.state = State::WaitingForRelease;
@@ -600,6 +643,7 @@ impl GestureEngine {
         let Some((id, tap_point)) = self.tap_remaining else { return };
         let finger = event.pointers.iter().copied().find(|p| p.id == id).unwrap_or(event.pointers[0]);
         if self.point(finger).distance(tap_point) > self.slop(self.thresholds.tap_max_distance) {
+            log::debug!("no right click: the remaining finger moved");
             self.tap_remaining = None;
             self.state = State::WaitingForRelease;
         }
@@ -651,6 +695,7 @@ impl GestureEngine {
         } else {
             SemanticAction::AppWindows
         };
+        log::debug!("swipe: {action:?}");
         self.emit(GestureAction::Semantic(action));
     }
 
@@ -756,7 +801,7 @@ impl GestureEngine {
                 let at = self.anchor(self.last_midpoint);
                 self.emit(GestureAction::Scroll { dx: 0.0, dy: 0.0, at, phase: ScrollPhase::Ended });
             }
-            State::TrackpadDragging => {
+            State::TrackpadHolding | State::TrackpadDragging => {
                 self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.cursor })
             }
             _ => {}
@@ -769,7 +814,11 @@ impl GestureEngine {
     fn is_trackpad_one_finger_state(&self) -> bool {
         matches!(
             self.state,
-            State::TrackpadPending | State::TrackpadPointing | State::TrackpadTapHold | State::TrackpadDragging
+            State::TrackpadPending
+                | State::TrackpadPointing
+                | State::TrackpadTapHold
+                | State::TrackpadHolding
+                | State::TrackpadDragging
         )
     }
 
@@ -814,6 +863,7 @@ impl GestureEngine {
         match self.last_tap {
             Some((time, _)) if elapsed(time, event.event_time_ms) <= self.thresholds.trackpad_double_tap_interval => {
                 self.state = State::TrackpadTapHold;
+                self.arm(Timer::LongPress); // resting after a tap presses the button
             }
             _ => {
                 self.last_tap = None;
@@ -835,6 +885,7 @@ impl GestureEngine {
             State::TrackpadPending => {
                 // The cursor follows at once (precise nudges); a tap snaps back to where it started.
                 if beyond_slop {
+                    log::debug!("trackpad: pointer moves");
                     self.state = State::TrackpadPointing;
                 }
                 self.move_cursor(dx, dy, dt);
@@ -851,10 +902,22 @@ impl GestureEngine {
                 if !beyond_slop {
                     return;
                 }
+                self.disarm(Timer::LongPress);
                 self.state = State::TrackpadDragging;
                 self.last_tap = None;
                 log::debug!("trackpad: double-tap-and-hold → drag");
                 self.emit(GestureAction::ButtonDown { button: MouseButton::Left, at: self.cursor });
+                self.move_cursor(dx, dy, dt);
+                self.emit(GestureAction::Drag { to: self.cursor });
+            }
+            // Jitter within the slop leaves the press where it is; point and time
+            // stay at touch-down as in TrackpadTapHold.
+            State::TrackpadHolding => {
+                if !beyond_slop {
+                    return;
+                }
+                self.state = State::TrackpadDragging;
+                log::debug!("trackpad: drag after a hold");
                 self.move_cursor(dx, dy, dt);
                 self.emit(GestureAction::Drag { to: self.cursor });
             }
@@ -872,31 +935,48 @@ impl GestureEngine {
         let p = self.point(self.primary_pointer(event));
         let t = event.event_time_ms;
         let held = elapsed(self.start_time, t);
-        let ms = (held * 1000.0) as i64;
-        let is_tap = held <= self.thresholds.trackpad_tap_max_duration
-            && p.distance(self.start_point) <= self.slop(self.thresholds.tap_max_distance);
+        let held_ms = ms(self.start_time, t);
+        let away = p.distance(self.start_point);
+        let in_place = away <= self.slop(self.thresholds.tap_max_distance);
+        let is_tap = held <= self.thresholds.trackpad_tap_max_duration && in_place;
+        self.disarm(Timer::LongPress);
         match self.state {
             State::TrackpadPending if is_tap => {
                 self.cursor = self.cursor_at_down;
-                log::debug!("trackpad tap after {ms} ms");
+                log::debug!("trackpad tap after {held_ms} ms");
                 self.emit(GestureAction::Click { at: self.cursor, count: 1 });
                 self.last_tap = Some((t, self.cursor));
             }
             State::TrackpadTapHold if is_tap => {
                 self.cursor = self.cursor_at_down;
-                log::debug!("trackpad double tap after {ms} ms");
+                log::debug!("trackpad double tap after {held_ms} ms");
                 self.emit(GestureAction::Click { at: self.cursor, count: 2 });
                 self.last_tap = None; // a third tap starts over
+            }
+            State::TrackpadTapHold if in_place && held >= self.thresholds.long_press_time => {
+                // Held long enough by the phone's clock, but the timer has not run yet:
+                // the click the held button would have made.
+                log::debug!("trackpad: click: tap then hold {held_ms} ms");
+                self.emit(GestureAction::Click { at: self.cursor, count: 1 });
+                self.last_tap = None;
+            }
+            State::TrackpadHolding => {
+                log::debug!("trackpad: left button up: hold {held_ms} ms");
+                self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.cursor });
+                self.last_tap = None;
             }
             State::TrackpadDragging => {
                 self.emit(GestureAction::ButtonUp { button: MouseButton::Left, at: self.cursor });
                 self.last_tap = None;
             }
             _ => {
-                if self.state == State::TrackpadPending {
-                    log::debug!("trackpad: no click (held {ms} ms)");
+                // A slow or moved touch, or a slow second touch: no click (a resting finger never presses).
+                match self.state {
+                    State::TrackpadPending if in_place => log::debug!("trackpad: no click (held {held_ms} ms)"),
+                    State::TrackpadPending => log::debug!("trackpad: no click (lifted {} dp away)", self.dp(away)),
+                    State::TrackpadTapHold => log::debug!("trackpad: no double click (held {held_ms} ms)"),
+                    _ => {}
                 }
-                // Pointing, a slow touch, or a slow second touch: no click (no long press).
                 self.last_tap = None;
             }
         }
@@ -945,6 +1025,11 @@ impl GestureEngine {
     fn slop(&self, dp: f64) -> f64 {
         dp * self.points_per_dp
     }
+
+    /// A display distance in whole phone dp (diagnostics).
+    fn dp(&self, points: f64) -> i64 {
+        (points / self.points_per_dp) as i64
+    }
 }
 
 /// The pointer the action refers to, else the first.
@@ -961,4 +1046,9 @@ fn sorted_ids(pointers: &[TouchPointer]) -> Vec<u8> {
 /// Seconds between two wrapping millisecond timestamps.
 fn elapsed(from: u32, to: u32) -> f64 {
     to.wrapping_sub(from) as f64 / 1000.0
+}
+
+/// Whole milliseconds between two timestamps (diagnostics).
+fn ms(from: u32, to: u32) -> i64 {
+    i64::from(to.wrapping_sub(from))
 }
