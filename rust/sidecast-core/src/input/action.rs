@@ -138,7 +138,8 @@ pub struct GestureThresholds {
     /// 3/4-finger swipe: centroid travel (dp, dominant axis) that triggers navigation.
     pub swipe_min_distance: f64,
     // Trackpad mode (PROTOCOL §7.3)
-    /// A tap: down to up within this, and within the tap slop.
+    /// A tap: down to up within this, and within the tap slop. Below
+    /// `long_press_time`, so a slow second touch can still turn into a hold.
     pub trackpad_tap_max_duration: f64,
     /// A second touch this soon after a tap's release is a double tap (or tap-and-hold drag).
     pub trackpad_double_tap_interval: f64,
@@ -171,7 +172,7 @@ impl Default for GestureThresholds {
             momentum_stop_threshold: 0.5,
             two_finger_tap_max_duration: 0.3,
             swipe_min_distance: 60.0,
-            trackpad_tap_max_duration: 0.25,
+            trackpad_tap_max_duration: 0.4,
             trackpad_double_tap_interval: 0.35,
             trackpad_base_gain: 0.6,
             trackpad_slow_speed: 150.0,

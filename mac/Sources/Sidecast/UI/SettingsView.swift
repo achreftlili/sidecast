@@ -68,12 +68,14 @@ struct SettingsView: View {
 
             Section("Input") {
                 Toggle("Phone controls the Mac (touch & keyboard)", isOn: $settings.touchEnabled)
-                Text("Hold ½ s = left button down (lift to click, move to drag). Two-finger tap = right click. 3/4-finger swipes: left/right switch Desktops, up = Mission Control, "
+                Text("Hold ½ s = left button down, the phone vibrates (lift to click, move to drag). Two-finger tap = right click. "
+                     + "3/4-finger swipes: left/right switch Desktops, up = Mission Control, "
                      + "down = App Exposé (uses the Mission Control keyboard shortcuts in System Settings → Keyboard → "
                      + "Keyboard Shortcuts).")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Trackpad mode (switched on the phone) turns the phone into a laptop trackpad: slide to move the "
-                     + "cursor, tap to click, double-tap and hold to drag, two fingers to right-click or scroll.")
+                     + "cursor, tap to click, tap then touch again and slide to drag (or rest ½ s to hold the button), "
+                     + "two fingers to right-click or scroll.")
                     .font(.caption).foregroundStyle(.secondary)
                 if settings.touchEnabled && !model.accessibilityTrusted {
                     HStack {

@@ -83,6 +83,30 @@ fn long_press_holds_the_left_button_until_lift() {
 }
 
 #[test]
+fn hold_started_is_reported_once_when_the_timer_presses_the_button() {
+    let mut h = Harness::new();
+    h.down(0, 200.0, 200.0);
+    h.advance(0.5);
+    assert!(h.engine.take_hold_started());
+    assert!(!h.engine.take_hold_started());
+    h.up(900, 200.0, 200.0);
+    // Inferred late from the phone's clock (the finger is already up or moving): no tick.
+    h.down(2000, 200.0, 200.0);
+    h.up(2650, 200.0, 200.0);
+    h.down(4000, 200.0, 200.0);
+    h.move_to(4600, 260.0, 200.0);
+    h.up(4620, 260.0, 200.0);
+    // Tap and scroll never press.
+    h.down(6000, 200.0, 200.0);
+    h.up(6080, 200.0, 200.0);
+    h.down(8000, 200.0, 200.0);
+    h.move_to(8100, 200.0, 260.0);
+    h.up(8120, 200.0, 260.0);
+    h.advance(1.0);
+    assert!(!h.engine.take_hold_started());
+}
+
+#[test]
 fn long_press_lifted_before_the_timer_runs_left_clicks() {
     let mut h = Harness::new();
     h.down(0, 200.0, 200.0);

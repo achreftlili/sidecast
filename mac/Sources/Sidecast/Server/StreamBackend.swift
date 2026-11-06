@@ -53,6 +53,9 @@ protocol StreamBackend: AnyObject {
     /// Set by the stream; trackpad-mode pointer positions (any thread). The Bool forces a send.
     var onCursor: ((CursorPosition, Bool) -> Void)? { get set }
 
+    /// Set by the stream; the left button went down on a resting finger (any thread), for HAPTIC.
+    var onHold: (() -> Void)? { get set }
+
     /// Reports the pointer again (forced), e.g. after a new STREAM_CONFIG in trackpad mode.
     func refreshCursor()
 }

@@ -170,16 +170,109 @@ fn jitter_during_a_tap_does_not_move_the_click() {
 fn slow_tap_and_long_press_do_nothing() {
     let mut h = Harness::trackpad();
     h.down(0, 500.0, 300.0);
-    h.up(300, 500.0, 300.0); // > 250 ms
+    h.up(450, 500.0, 300.0); // > 400 ms
     h.down(1000, 500.0, 300.0);
     h.advance(1.0);
-    h.up(1900, 500.0, 300.0); // a long press
+    h.up(1900, 500.0, 300.0); // a single resting finger
     assert!(h.clicks().is_empty());
     assert!(h.right_clicks().is_empty(), "no long-press right click in trackpad mode");
-    assert!(
-        !h.actions.iter().any(|a| matches!(a, GestureAction::ButtonDown { .. })),
-        "no long-press button in trackpad mode"
-    );
+    assert!(!has_button_down(&h), "a single resting finger never presses in trackpad mode");
+}
+
+#[test]
+fn taps_up_to_400_milliseconds_click() {
+    let mut h = Harness::trackpad();
+    h.down(0, 500.0, 300.0);
+    h.up(380, 500.0, 300.0);
+    assert_eq!(h.clicks(), [centre_click(1)]);
+}
+
+// MARK: - Tap then hold
+
+fn has_button_down(h: &Harness) -> bool {
+    h.actions.iter().any(|a| matches!(a, GestureAction::ButtonDown { .. }))
+}
+
+/// A tap, then a second touch (anywhere on the phone) resting for 0.5 s.
+fn tap_then_rest() -> Harness {
+    let mut h = Harness::trackpad();
+    h.down(0, 500.0, 300.0);
+    h.up(60, 500.0, 300.0);
+    h.down(200, 700.0, 100.0);
+    h.advance(0.5);
+    h
+}
+
+#[test]
+fn tap_then_hold_presses_the_button_at_the_cursor_until_lift() {
+    let mut h = tap_then_rest();
+    assert_eq!(h.actions.last(), Some(&GestureAction::ButtonDown { button: MouseButton::Left, at: CENTRE }));
+    assert!(h.engine.is_button_held());
+    assert!(h.engine.take_hold_started());
+    assert!(!h.engine.take_hold_started(), "reported once");
+    h.move_to(800, 704.0, 102.0); // jitter within the slop: the press stays put
+    h.up(1500, 704.0, 102.0);
+    assert_eq!(h.actions.last(), Some(&GestureAction::ButtonUp { button: MouseButton::Left, at: CENTRE }));
+    assert!(!h.engine.is_button_held());
+    assert_eq!(h.clicks(), [centre_click(1)], "the hold is not a double click");
+    assert_eq!(h.engine.cursor(), CENTRE);
+}
+
+#[test]
+fn tap_then_hold_then_move_drags() {
+    let mut h = tap_then_rest();
+    let end = slide(&mut h, 800, (700.0, 100.0), (40.0, 0.0), 20, 50); // slow, beyond the slop
+    assert!(h.engine.is_button_held());
+    h.up(end + 20, 740.0, 100.0);
+    let drags = h.drags();
+    assert!(!drags.is_empty());
+    assert_close(drags.last().unwrap().x, 512.0 + 40.0 * 0.6); // relative drag, whole travel applied
+    assert_eq!(h.actions.last(), Some(&GestureAction::ButtonUp { button: MouseButton::Left, at: h.engine.cursor() }));
+    assert_eq!(h.actions.iter().filter(|a| matches!(a, GestureAction::ButtonDown { .. })).count(), 1);
+}
+
+#[test]
+fn tap_then_hold_lifted_before_the_timer_runs_clicks() {
+    let mut h = Harness::trackpad();
+    h.down(0, 500.0, 300.0);
+    h.up(60, 500.0, 300.0);
+    h.down(200, 500.0, 300.0);
+    h.up(800, 500.0, 300.0); // 0.6 s by the phone's clock; the timer has not run
+    assert_eq!(h.clicks(), [centre_click(1), centre_click(1)]);
+    h.advance(1.0);
+    assert!(!has_button_down(&h));
+    assert!(!h.engine.take_hold_started(), "inferred late: no haptic");
+}
+
+#[test]
+fn slow_second_touch_short_of_a_hold_does_nothing() {
+    let mut h = Harness::trackpad();
+    h.down(0, 500.0, 300.0);
+    h.up(60, 500.0, 300.0);
+    h.down(200, 500.0, 300.0);
+    h.up(650, 500.0, 300.0); // 450 ms: too slow for a double tap, too short for a hold
+    h.advance(1.0);
+    assert_eq!(h.clicks(), [centre_click(1)]);
+    assert!(!has_button_down(&h));
+}
+
+#[test]
+fn second_finger_releases_a_trackpad_hold_without_a_right_click() {
+    let mut h = tap_then_rest();
+    h.touch(800, TouchAction::PointerDown, &[(0, 700.0, 100.0), (1, 760.0, 100.0)], Some(1));
+    assert_eq!(h.actions.last(), Some(&GestureAction::ButtonUp { button: MouseButton::Left, at: CENTRE }));
+    h.touch(850, TouchAction::PointerUp, &[(0, 700.0, 100.0), (1, 760.0, 100.0)], Some(1));
+    h.touch(900, TouchAction::Up, &[(0, 700.0, 100.0)], None);
+    assert!(h.right_clicks().is_empty());
+    assert!(!h.engine.is_button_held());
+}
+
+#[test]
+fn mode_change_releases_a_trackpad_hold() {
+    let mut h = tap_then_rest();
+    h.set_mode(InputMode::Touch);
+    assert_eq!(h.actions.last(), Some(&GestureAction::ButtonUp { button: MouseButton::Left, at: CENTRE }));
+    assert!(!h.engine.is_button_held());
 }
 
 #[test]

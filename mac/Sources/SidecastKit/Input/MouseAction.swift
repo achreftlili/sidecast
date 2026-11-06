@@ -95,8 +95,9 @@ public struct GestureThresholds: Sendable {
     public var swipeMinDistance: Double = 60
 
     // Trackpad mode (PROTOCOL §7.3)
-    /// A tap: down to up within this, and within the tap slop.
-    public var trackpadTapMaxDuration: TimeInterval = 0.25
+    /// A tap: down to up within this, and within the tap slop. Below `longPressTime`,
+    /// so a slow second touch can still turn into a hold.
+    public var trackpadTapMaxDuration: TimeInterval = 0.4
     /// A second touch this soon after a tap's release is a double tap (or tap-and-hold drag).
     public var trackpadDoubleTapInterval: TimeInterval = 0.35
     /// Cursor points per finger point at slow speed: a full phone-width swipe ≈ 60 % of the display.

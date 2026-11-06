@@ -11,6 +11,9 @@ final class DisplayCaptureBackend: StreamBackend {
     var onCursor: ((CursorPosition, Bool) -> Void)? {
         didSet { input.onCursor = onCursor }
     }
+    var onHold: (() -> Void)? {
+        didSet { input.onHold = onHold }
+    }
     /// Main queue: input was dropped for lack of Accessibility.
     var onAccessibilityMissing: (() -> Void)? {
         didSet { input.onAccessibilityMissing = onAccessibilityMissing }
