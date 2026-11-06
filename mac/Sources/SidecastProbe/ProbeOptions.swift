@@ -42,10 +42,10 @@ struct ProbeOptions {
                                                               MODS: 1 Shift, 2 Ctrl, 4 Option, 8 Cmd)
                           [--mic]   (advertise the microphone; send a 440 Hz tone when asked)
                           [--gesture NAME]…   (tap2 swipe3-left swipe3-right swipe3-up swipe3-down
-                                               swipe4-left tap3 scroll2)
+                                               swipe4-left tap3 scroll2 hold)
                           [--network metered|unmetered] [--limits KBPS:FPS]   (data saver, e.g. 4000:30)
                           [--input-mode touch|trackpad]   (+ gestures trackpad-move trackpad-tap
-                                                           trackpad-doubletap-drag)
+                                                           trackpad-doubletap-drag trackpad-tap-hold)
     """
 
     static func parse(_ args: [String]) throws -> ProbeOptions {

@@ -503,6 +503,7 @@ impl Session {
                 }
             }
             StreamEvent::Cursor { position, force } => stream.on_cursor(position, force),
+            StreamEvent::Hold => stream.on_hold(),
         }
     }
 

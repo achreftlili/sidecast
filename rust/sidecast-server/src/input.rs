@@ -1,7 +1,8 @@
 //! The input task of a stream: TOUCH → gesture engine → human-like click
 //! timelines → the platform's [`InputSink`], plus TEXT and KEY, all on one
 //! task so touches and keys stay in order (a click's 40 ms hold delays what
-//! follows, as on the Mac). In trackpad mode it reports the pointer for CURSOR.
+//! follows, as on the Mac). In trackpad mode it reports the pointer for CURSOR;
+//! a hold that presses the button is reported for HAPTIC.
 
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
@@ -88,6 +89,9 @@ impl InputTask {
                 _ = tokio::time::sleep_until(timer.map_or_else(Instant::now, |t| t.1)), if timer.is_some() => {
                     if let Some((generation, _)) = timer {
                         let actions = self.engine.fire_timer(generation);
+                        if self.engine.take_hold_started() {
+                            let _ = self.events.send(StreamEvent::Hold);
+                        }
                         self.apply_all(actions).await;
                     }
                 }
@@ -101,7 +105,7 @@ impl InputTask {
         lock(&self.sink).release_all();
     }
 
-    /// Arms the momentum timer the engine asked for (a new generation replaces the old one).
+    /// Arms the timer (long press or momentum) the engine asked for (a new generation replaces the old one).
     fn sync_timer(&mut self) {
         self.timer = match (self.engine.pending_timer(), self.timer) {
             (None, _) => None,

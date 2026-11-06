@@ -103,6 +103,9 @@ final class StreamController {
         backend.onCursor = { [weak self] position, force in
             self?.queue.async { self?.handleCursor(position, force: force) }
         }
+        backend.onHold = { [weak self] in
+            self?.queue.async { self?.sendHaptic() }
+        }
         lastActivity = clock.now()
         startTimer()
         startBackend()
@@ -197,6 +200,14 @@ final class StreamController {
         send(ServerMessage.cursor(p).encoded())
         cursorsInWindow += 1
         lastCursor = p
+    }
+
+    // MARK: - HAPTIC
+
+    /// The button went down on a resting finger: the phone ticks (PROTOCOL §7.4).
+    private func sendHaptic() {
+        guard running else { return }
+        send(ServerMessage.haptic(.hold).encoded())
     }
 
     /// Applies new settings; restarts the pipeline (new STREAM_CONFIG) if the plan changes.

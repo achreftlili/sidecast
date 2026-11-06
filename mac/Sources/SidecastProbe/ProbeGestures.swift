@@ -14,10 +14,12 @@ enum ProbeGesture: String, CaseIterable {
     case swipe4Left = "swipe4-left"
     case tap3
     case scroll2
+    case hold
     // Meant for --input-mode trackpad
     case trackpadMove = "trackpad-move"
     case trackpadTap = "trackpad-tap"
     case trackpadDoubletapDrag = "trackpad-doubletap-drag"
+    case trackpadTapHold = "trackpad-tap-hold"
 
     /// What the Mac's gesture engine should make of it.
     var expected: String {
@@ -29,9 +31,11 @@ enum ProbeGesture: String, CaseIterable {
         case .swipe3Down: return "navigate appExpose (Control+↓)"
         case .tap3: return "nothing"
         case .scroll2: return "scroll began…ended (+ momentum)"
+        case .hold: return "left button down after 0.5 s (+ HAPTIC hold), button up on lift"
         case .trackpadMove: return "trackpad: cursor moves right ≈ 0.6 × 20 % of the display"
         case .trackpadTap: return "trackpad: click at the cursor (not at the finger)"
         case .trackpadDoubletapDrag: return "trackpad: click, then button down + drag + button up at the cursor"
+        case .trackpadTapHold: return "trackpad: click, then button down at the cursor after 0.5 s (+ HAPTIC hold), up on lift"
         }
     }
 
@@ -67,6 +71,12 @@ enum ProbeGesture: String, CaseIterable {
             s.wait(20)
             s.move(dx: 0, dy: 0.25, duration: 160)              // a flick: momentum should follow
             s.up(spacing: 8)
+        case .hold:
+            s.down([(0.5, 0.5)])
+            s.wait(400)
+            s.move(dx: 0.002, dy: 0.001, duration: 16)          // finger jitter, within the slop
+            s.wait(400)
+            s.up()
         case .trackpadMove:
             s.down([(0.3, 0.5)])
             s.wait(16)
@@ -84,6 +94,14 @@ enum ProbeGesture: String, CaseIterable {
             s.down([(0.5, 0.6)])
             s.wait(60)
             s.move(dx: -0.1, dy: 0.05, duration: 300)
+            s.up()
+        case .trackpadTapHold:
+            s.down([(0.5, 0.6)])
+            s.wait(60)
+            s.up()
+            s.wait(120)                                         // second touch within 350 ms…
+            s.down([(0.5, 0.6)])
+            s.wait(800)                                         // …resting past 0.5 s
             s.up()
         }
         return s.steps
