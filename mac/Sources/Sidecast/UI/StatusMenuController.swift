@@ -57,7 +57,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         menu.addItem(disabled(model.statusLine))
         if model.sleep.sleepDisabled {
-            menu.addItem(disabled("Sleep disabled while connected"))
+            menu.addItem(disabled(model.sleep.keepAwake ? "Sleep disabled while Sidecast runs"
+                                                        : "Sleep disabled while connected"))
         }
         if model.isStreaming || model.mic.phone != .noPhone {
             menu.addItem(disabled(model.mic.line))
