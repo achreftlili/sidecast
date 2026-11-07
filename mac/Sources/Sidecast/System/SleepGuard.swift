@@ -3,17 +3,20 @@ import Foundation
 import IOKit.pwr_mgt
 import SidecastKit
 
-/// Keeps the Mac awake while a phone streams (DECISIONS Q19–Q21):
-/// - IOPM assertions (no root, released automatically if we die);
+/// Keeps the Mac awake while a phone streams (DECISIONS Q19–Q21), or for as
+/// long as Sidecast runs when the user asks (Q41):
+/// - IOPM assertions while streaming (no root, released automatically if we die);
 /// - `pmset -a disablesleep 1` through the sudoers rule, so a closed lid does
-///   not sleep either; restored 30 s after the last stream ends, on launch if
-///   a marker says we left it disabled, on quit, and by a detached watcher
-///   process if the app dies.
+///   not sleep either; restored 30 s after the last stream ends (unless kept
+///   awake), on launch if a marker says we left it disabled, on quit, and by a
+///   detached watcher process if the app dies.
 /// sudo is only ever run with `-n` (never prompts), off the main thread.
 final class SleepGuard {
     struct Status: Equatable {
         var ruleInstalled = false
         var sleepDisabled = false
+        /// Sleep stays disabled with no phone connected too (the setting).
+        var keepAwake = false
     }
 
     static let gracePeriod: TimeInterval = 30
@@ -29,6 +32,9 @@ final class SleepGuard {
     private let queue = DispatchQueue(label: "com.achreftlili.sidecast.sleepguard")
     private var assertions: [IOPMAssertionID] = []
     private var graceTimer: DispatchWorkItem?
+    /// Main thread.
+    private var streaming = false
+    private var keepAwake = false
 
     init(markerURL: URL) {
         self.markerURL = markerURL
@@ -58,6 +64,7 @@ final class SleepGuard {
     /// Call on the main thread whenever streaming starts or stops.
     func setStreaming(_ streaming: Bool) {
         dispatchPrecondition(condition: .onQueue(.main))
+        self.streaming = streaming
         if streaming {
             graceTimer?.cancel()
             graceTimer = nil
@@ -69,10 +76,28 @@ final class SleepGuard {
                 guard let self else { return }
                 self.graceTimer = nil
                 self.releaseAssertions()
-                self.queue.async { self.restoreSleep() }
+                if !self.keepAwake { self.queue.async { self.restoreSleep() } }
             }
             graceTimer = work
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.gracePeriod, execute: work)
+        }
+    }
+
+    /// The "keep awake with no phone connected" setting. Main thread.
+    /// The display still sleeps; only system sleep (idle and lid) is blocked.
+    func setKeepAwake(_ on: Bool) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        guard on != keepAwake else { return }
+        keepAwake = on
+        // Off while a phone streams or the grace period runs: that path restores later.
+        let restore = !on && !streaming && graceTimer == nil
+        queue.async {
+            self.update { $0.keepAwake = on }
+            if on {
+                self.disableSleep()
+            } else if restore {
+                self.restoreSleep()
+            }
         }
     }
 
@@ -88,8 +113,8 @@ final class SleepGuard {
         defer { try? FileManager.default.removeItem(at: staged) }
         try runAdmin(SudoersRule.installCommand(stagedFile: staged.path))
         queue.sync { self.refreshRuleStatus() }
-        // Already streaming? Disable sleep now that we can.
-        if !assertions.isEmpty { queue.async { self.disableSleep() } }
+        // Already streaming, or kept awake? Disable sleep now that we can.
+        if !assertions.isEmpty || keepAwake { queue.async { self.disableSleep() } }
     }
 
     /// Restores sleep first (while the rule still works), then removes the rule.
@@ -137,7 +162,8 @@ final class SleepGuard {
             return
         }
         if sudo([SudoersRule.pmsetPath] + SudoersRule.disableSleepArgs).succeeded {
-            Log.info("sleep: system sleep disabled while connected")
+            Log.info(current.keepAwake ? "sleep: system sleep disabled while Sidecast runs"
+                                       : "sleep: system sleep disabled while connected")
             update { $0.sleepDisabled = true }
         } else {
             try? FileManager.default.removeItem(at: markerURL)

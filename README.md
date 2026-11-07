@@ -8,7 +8,7 @@ Free and open source (Apache 2.0). No account, no cloud, no telemetry: the phone
 - **Touch and trackpad**: tap, right-click, drag, scroll, pinch, 3/4-finger swipes for Spaces and Mission Control, and a trackpad mode with a visible pointer for precise apps like VS Code.
 - **Type from the phone**, including the phone keyboard's voice typing.
 - **Phone microphone as a Mac microphone** ("Sidecast Microphone").
-- **Keeps the Mac awake** while a phone is connected (optional).
+- **Keeps the Mac awake** while a phone is connected, or whenever Sidecast runs so you can reach it with the lid closed (optional).
 - **Remote access** over [Tailscale](https://tailscale.com): LAN first, Tailscale when you're away, data saver on mobile data.
 
 The Mac creates a virtual monitor, captures it with ScreenCaptureKit, encodes it with the hardware HEVC/H.264 encoder and streams it over TLS. The phone decodes it full screen and sends touches back as mouse and keyboard input. Design decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Wire protocol: [docs/PROTOCOL.md](docs/PROTOCOL.md). Where it's going (Windows, Linux, iOS): [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -160,7 +160,7 @@ Pairings and settings are kept.
    - **Screen Recording**: required to stream the virtual display.
    - **Accessibility**: required for touch → mouse and keyboard input.
    - **Local Network**: allow, so the phone can find the Mac.
-5. Optional: menu bar → **Keep Mac awake while connected…** asks for your admin password once and installs a sudoers rule that allows only `pmset -a disablesleep 0|1`. While a phone is connected the Mac won't sleep, even with the lid closed. Sleep comes back 30 s after the phone disconnects, and is restored if Sidecast crashes. Remove it with **Remove sleep permission…** (do this *before* deleting the app).
+5. Optional: menu bar → **Keep Mac awake while connected…** asks for your admin password once and installs a sudoers rule that allows only `pmset -a disablesleep 0|1`. While a phone is connected the Mac won't sleep, even with the lid closed. Sleep comes back 30 s after the phone disconnects, and is restored if Sidecast crashes. To reach the Mac from outside with the lid closed, also turn on Settings → Keep Mac awake → **Also when no phone is connected**: the Mac then never sleeps while Sidecast runs, on battery too (the display still turns off). Remove the rule with **Remove sleep permission…** (do this *before* deleting the app).
 
 Arrange the new display in System Settings → Displays like any monitor.
 
@@ -176,7 +176,7 @@ Arrange the new display in System Settings → Displays like any monitor.
 - Mac: Settings → Phone microphone → **Install…** adds a "Sidecast Microphone" input (admin password once). While the phone is connected it becomes the default input; the phone records only while a Mac app is listening (red **Mic** chip on the phone).
 
 ### Away from home (Tailscale)
-Install [Tailscale](https://tailscale.com) on the Mac and the phone and sign both into the same tailnet (the free plan is enough). Sidecast then tries Wi-Fi first and falls back to Tailscale automatically. Nothing is opened on your router. On mobile data, **Data saver** (phone settings) limits the stream to 4 Mbps and 30 fps. Your Mac must stay awake: see Settings → Remote access on the Mac.
+Install [Tailscale](https://tailscale.com) on the Mac and the phone and sign both into the same tailnet (the free plan is enough). Sidecast then tries Wi-Fi first and falls back to Tailscale automatically. Nothing is opened on your router. On mobile data, **Data saver** (phone settings) limits the stream to 4 Mbps and 30 fps. Your Mac must stay awake, because a sleeping Mac cannot be reached: with the lid closed, a Mac only stays awake while a phone is connected, so turn on Settings → Keep Mac awake → **Also when no phone is connected** before you leave.
 
 ## Security
 

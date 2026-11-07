@@ -14,6 +14,7 @@ final class AppSettings: ObservableObject {
         static let micEnabled = "micEnabled"
         static let micMakeDefaultInput = "micMakeDefaultInput"
         static let port = "port"
+        static let keepAwake = "keepAwake"
     }
 
     static let portRange = 1024...65535
@@ -32,6 +33,9 @@ final class AppSettings: ObservableObject {
     /// "Make Sidecast Microphone the default input while a phone is connected".
     @Published var micMakeDefaultInput: Bool { didSet { save(Key.micMakeDefaultInput, micMakeDefaultInput) } }
     @Published var port: Int { didSet { save(Key.port, port) } }
+    /// Keep the Mac awake (lid closed too) whenever Sidecast runs, not only while a phone
+    /// is connected, so a phone can reach it from anywhere (DECISIONS Q41).
+    @Published var keepAwake: Bool { didSet { save(Key.keepAwake, keepAwake) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -48,6 +52,7 @@ final class AppSettings: ObservableObject {
         micMakeDefaultInput = defaults.object(forKey: Key.micMakeDefaultInput) as? Bool ?? true
         let port = defaults.object(forKey: Key.port) as? Int ?? Int(SidecastProtocol.defaultPort)
         self.port = Self.portRange.contains(port) ? port : Int(SidecastProtocol.defaultPort)
+        keepAwake = defaults.object(forKey: Key.keepAwake) as? Bool ?? false
     }
 
     var streamSettings: StreamSettings {

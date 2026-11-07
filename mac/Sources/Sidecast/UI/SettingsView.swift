@@ -97,8 +97,10 @@ struct SettingsView: View {
                     Text("Paired phones learn this address and use it automatically when they are away from this network.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Text("For remote use keep the Mac awake: System Settings → Battery (or Energy) → Options → "
-                     + "Prevent automatic sleeping on power adapter when the display is off.")
+                Text("A sleeping Mac cannot be reached: turn on “Also when no phone is connected” under "
+                     + "Keep Mac awake below, or, with the lid open on the power adapter, System Settings → "
+                     + "Battery (or Energy) → Options → Prevent automatic sleeping on power adapter when the "
+                     + "display is off.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
@@ -162,7 +164,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Keep Mac awake while connected") {
+            Section("Keep Mac awake") {
                 Text("Lets Sidecast run “pmset -a disablesleep” (and nothing else) without a password, so the Mac "
                      + "does not sleep — even with the lid closed — while a phone is connected. Sleep is restored "
                      + "30 s after the phone disconnects, and if Sidecast quits or crashes.")
@@ -177,6 +179,12 @@ struct SettingsView: View {
                         Button("Install…") { actions.installSleepRule() }
                     }
                 }
+                Toggle("Also when no phone is connected", isOn: $settings.keepAwake)
+                    .disabled(!model.sleep.ruleInstalled)
+                Text("To reach the Mac from anywhere with the lid closed: it then never sleeps while Sidecast "
+                     + "runs, on battery too, so keep it out of a bag and watch the battery. The display still "
+                     + "turns off. Quit Sidecast to let the Mac sleep.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

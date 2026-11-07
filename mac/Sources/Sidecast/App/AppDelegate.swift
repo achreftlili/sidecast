@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let sleepGuard = SleepGuard(markerURL: paths.sleepMarker)
         sleepGuard.onChange = { [weak self] status in self?.model.sleep = status }
         sleepGuard.startUp()
+        sleepGuard.setKeepAwake(settings.keepAwake)
         self.sleepGuard = sleepGuard
 
         let micRouter = MicRouter(markerURL: paths.defaultInputMarker, installer: micInstaller)
@@ -192,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func settingsChanged() {
         server?.update(settings: settings.streamSettings)
         micRouter?.update(settings: settings.micSettings)
+        sleepGuard?.setKeepAwake(settings.keepAwake)
         if settings.port != appliedPort, let port = UInt16(exactly: settings.port) {
             appliedPort = settings.port
             server?.setPort(port)
