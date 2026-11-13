@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .executable(name: "Sidecast", targets: ["Sidecast"]),
         .executable(name: "sidecast-probe", targets: ["SidecastProbe"]),
+        .executable(name: "VirtualDisplayHelper", targets: ["VirtualDisplayHelper"]),
         .library(name: "SidecastKit", targets: ["SidecastKit"]),
     ],
     targets: [
@@ -25,6 +26,11 @@ let package = Package(
         .executableTarget(
             name: "Sidecast",
             dependencies: ["SidecastKit", "CVirtualDisplay"]
+        ),
+        // Out-of-process owner of the CGVirtualDisplay (shipped in Contents/Helpers).
+        .executableTarget(
+            name: "VirtualDisplayHelper",
+            dependencies: ["CVirtualDisplay"]
         ),
         // CLI test client.
         .executableTarget(
