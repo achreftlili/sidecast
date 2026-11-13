@@ -118,14 +118,42 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate {
     @MainActor
     private func findDisplay() async throws -> SCDisplay {
         for attempt in 1...10 {
-            if let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false),
-               let display = content.displays.first(where: { $0.displayID == displayID }) {
-                return display
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(
+                    false,
+                    onScreenWindowsOnly: false
+                )
+
+                let availableIDs = content.displays.map { $0.displayID }
+
+                Log.info("""
+                    capture: attempt \(attempt)
+                    target display ID: \(displayID)
+                    ScreenCaptureKit display IDs: \(availableIDs)
+                    CG online: \(CGDisplayIsOnline(displayID))
+                    CG active: \(CGDisplayIsActive(displayID))
+                    """)
+
+                if let display = content.displays.first(
+                    where: { $0.displayID == displayID }
+                ) {
+                    Log.info("capture: matched display \(displayID)")
+                    return display
+                }
+
+            } catch {
+                Log.error("""
+                    capture: ScreenCaptureKit query failed \
+                    on attempt \(attempt): \(error)
+                    """)
             }
-            Log.debug("capture: display \(displayID) not visible yet (attempt \(attempt))")
+
             try await Task.sleep(nanoseconds: 500_000_000)
         }
-        throw StreamStartError.captureFailed("display \(displayID) never appeared in ScreenCaptureKit")
+
+        throw StreamStartError.captureFailed(
+            "display \(displayID) never appeared in ScreenCaptureKit"
+        )
     }
 
     // MARK: - SCStreamOutput / SCStreamDelegate

@@ -23,16 +23,29 @@ final class DisplayCaptureBackend: StreamBackend {
     private var capture: ScreenCaptureSource?     // main thread
     private let input = InputController()
 
+    /// Bumped by every start and stop, so a start that is still awaiting the helper
+    /// can tell it was cancelled (user disconnected) or superseded. Main thread.
+    private var generation = 0
+
     func start(plan: StreamPlan, client: ClientInfo, onFrame: @escaping FrameHandler,
                completion: @escaping (Result<Void, Error>) -> Void) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.tearDown()
+            let myGeneration = self.generation
             let display: VirtualDisplay
             do {
-                display = try VirtualDisplay(mode: plan.display, name: "Sidecast (\(client.deviceName))",
-                                             serial: VirtualDisplay.serial(for: client.deviceId))
+                display = try await VirtualDisplay.start(mode: plan.display, name: "Sidecast (\(client.deviceName))",
+                                                         serial: VirtualDisplay.serial(for: client.deviceId))
             } catch {
                 return completion(.failure(StreamStartError.displayFailed("\(error)")))
+            }
+            guard self.generation == myGeneration else {   // stopped or restarted while the helper was starting
+                display.stop()
+                return completion(.failure(StreamStartError.displayFailed("cancelled while the display was starting")))
+            }
+            display.onUnexpectedExit = { [weak self, weak display] in
+                guard let self, let display, self.display === display else { return }
+                self.onRuntimeFailure?(StreamStartError.displayFailed("the virtual display helper exited unexpectedly"))
             }
             self.display = display
             let capture = ScreenCaptureSource(displayID: display.displayID, width: plan.encodeWidth,
@@ -83,9 +96,11 @@ final class DisplayCaptureBackend: StreamBackend {
     }
 
     private func tearDown() {
-        capture?.stop()
+        generation += 1
+        capture?.stop()          // stop capture first...
         capture = nil
-        display = nil   // releasing the CGVirtualDisplay removes it
+        display?.stop()          // ...then stop the helper, which removes the virtual display
+        display = nil
     }
 
     /// Display points per phone dp: the display spans the phone's width.

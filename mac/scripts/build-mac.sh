@@ -62,8 +62,10 @@ iconutil -c icns -o "$WORK/AppIcon.icns" "$WORK/AppIcon.iconset"
 step "Assembling $APP"
 mkdir -p "$DIST"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers"
 cp "$BIN_DIR/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
+# Owns the CGVirtualDisplay in its own process (same arch: built by the same swift build).
+cp "$BIN_DIR/VirtualDisplayHelper" "$APP/Contents/Helpers/VirtualDisplayHelper"
 cp "$WORK/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -119,6 +121,15 @@ step "Building SidecastMic.driver (Sidecast Microphone) into the app"
 "$SCRIPT_DIR/build-mic-driver.sh" "$APP/Contents/Resources/SidecastMic.driver" "$SIGN_IDENTITY"
 
 step "Signing ($([[ "$SIGN_IDENTITY" == "-" ]] && echo ad-hoc || echo "$SIGN_IDENTITY"))"
+# The helper is signed first, on its own (nested code is not covered by --deep reliably
+# for Contents/Helpers), with a stable identifier so its signature survives rebuilds.
+if [[ "$SIGN_IDENTITY" == "-" || "$SIGN_IDENTITY" == "$LOCAL_IDENTITY" ]]; then
+    codesign --force --sign "$SIGN_IDENTITY" --identifier "$BUNDLE_ID.VirtualDisplayHelper" \
+        "$APP/Contents/Helpers/VirtualDisplayHelper"
+else
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        --identifier "$BUNDLE_ID.VirtualDisplayHelper" "$APP/Contents/Helpers/VirtualDisplayHelper"
+fi
 if [[ "$SIGN_IDENTITY" == "-" || "$SIGN_IDENTITY" == "$LOCAL_IDENTITY" ]]; then
     # Ad-hoc or the local self-signed identity: no hardened runtime, no timestamp.
     codesign --force --deep --sign "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "$APP"
@@ -129,6 +140,9 @@ else
 fi
 codesign --verify --deep --strict "$APP"
 codesign --verify --strict "$APP/Contents/Resources/SidecastMic.driver"
+codesign --verify --strict "$APP/Contents/Helpers/VirtualDisplayHelper"
+[[ "$(lipo -archs "$APP/Contents/Helpers/VirtualDisplayHelper")" == "$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")" ]] \
+    || { echo "error: helper and app architectures differ" >&2; exit 1; }
 
 step "Creating $DMG"
 STAGING="$WORK/dmg"
